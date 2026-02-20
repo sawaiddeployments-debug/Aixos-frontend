@@ -12,6 +12,8 @@ import L from 'leaflet';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 import { useRef } from 'react';
+import ChatModal from '../../components/Chat/ChatModal';
+import { MOCK_MESSAGES } from '../../data/mockMessages';
 
 let DefaultIcon = L.icon({
   iconUrl: icon,
@@ -45,6 +47,8 @@ const AgentDashboard = () => {
   const [loadingQueries, setLoadingQueries] = useState(true);
   const [userLocation, setUserLocation] = useState(null);
   const [activeTab, setActiveTab] = useState('Monthly');
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [selectedQueryId, setSelectedQueryId] = useState(null);
   const markerRef = useRef(null);
 
   const getWeekNumber = (date) => {
@@ -208,9 +212,7 @@ const AgentDashboard = () => {
             )
           `)
           .eq('visits.agent_id', user.id)
-          .eq('query_status', 'Active')
           .order('created_at', { ascending: false })
-          .limit(10);
 
         if (error) throw error;
         setQueries(data || []);
@@ -415,7 +417,7 @@ const AgentDashboard = () => {
                 <th className="px-6 py-4">Query No</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Due Date</th>
-                <th className="px-6 py-4 text-right">Action</th>
+                <th className="px-6 py-4">Remarks</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -444,7 +446,7 @@ const AgentDashboard = () => {
                         query.status === 'Refilled' ? 'bg-blue-100 text-blue-700' :
                           'bg-orange-100 text-orange-700'
                         }`}>
-                        {query.status || 'Pending'}
+                        {query.query_status || 'Pending'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -453,14 +455,20 @@ const AgentDashboard = () => {
                         {query.visits?.follow_up_date ? new Date(query.visits.follow_up_date).toLocaleDateString() : 'No date set'}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <Link
-                        to={`/agent/query/${query.id}`}
+                    <td className="px-6 py-4 text-right flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedQueryId(query.id);
+                          setIsChatOpen(true);
+                        }}
                         className="inline-flex items-center justify-center p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                        title="View Conversation"
                       >
-                        <ArrowRight size={20} />
-                      </Link>
+                        <MessageSquare size={20} />
+                      </button>
+
                     </td>
+
                   </tr>
                 ))
               )}
@@ -468,6 +476,12 @@ const AgentDashboard = () => {
           </table>
         </div>
       </div>
+
+      <ChatModal
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        queryId={selectedQueryId}
+      />
     </div>
   );
 };
