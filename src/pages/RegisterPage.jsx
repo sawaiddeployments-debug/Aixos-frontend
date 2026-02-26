@@ -28,9 +28,9 @@ const RegisterPage = () => {
 
     // Separate state for files
     const [files, setFiles] = useState({
-    profile_photo: null,
-    residential_letter: null,
-});
+        profile_photo: null,
+        residential_letter: null,
+    });
 
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -86,18 +86,18 @@ const RegisterPage = () => {
             const isAgent = role === 'agent';
 
             if (isAgent) {
-    const formDataObj = new FormData();
-    Object.keys(baseData).forEach(key => {
-        formDataObj.append(key, baseData[key]);
-    });
+                const formDataObj = new FormData();
+                Object.keys(baseData).forEach(key => {
+                    formDataObj.append(key, baseData[key]);
+                });
 
-    if (files.profile_photo) formDataObj.append('profile_photo', files.profile_photo);
-    if (files.residential_letter) formDataObj.append('residential_letter', files.residential_letter); // new
+                if (files.profile_photo) formDataObj.append('profile_photo', files.profile_photo);
+                if (files.residential_letter) formDataObj.append('residential_letter', files.residential_letter); // new
 
-    dataToSend = formDataObj;
-} else {
-    dataToSend = baseData;
-}
+                dataToSend = formDataObj;
+            } else {
+                dataToSend = baseData;
+            }
 
 
             const result = await register(role, dataToSend);
@@ -192,23 +192,23 @@ const RegisterPage = () => {
                                             </div>
                                         </div>
                                         <div className="col-span-1">
-    <label className="block text-sm font-medium text-slate-700 mb-1">Residential Letter</label>
-    <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors h-[46px] flex items-center justify-center cursor-pointer group">
-        <input 
-            type="file" 
-            name="residential_letter" 
-            onChange={handleChange} 
-            accept="image/*" 
-            className="absolute inset-0 opacity-0 cursor-pointer" 
-            required 
-        />
-        {files.residential_letter ? (
-            <img src={URL.createObjectURL(files.residential_letter)} alt="Preview" className="h-full w-full object-cover" />
-        ) : (
-            <Upload size={18} className="text-slate-400 group-hover:text-primary-500" />
-        )}
-    </div>
-</div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">Residential Letter</label>
+                                            <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors h-[46px] flex items-center justify-center cursor-pointer group">
+                                                <input
+                                                    type="file"
+                                                    name="residential_letter"
+                                                    onChange={handleChange}
+                                                    accept="image/*"
+                                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                                    required
+                                                />
+                                                {files.residential_letter ? (
+                                                    <img src={URL.createObjectURL(files.residential_letter)} alt="Preview" className="h-full w-full object-cover" />
+                                                ) : (
+                                                    <Upload size={18} className="text-slate-400 group-hover:text-primary-500" />
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
 
 
@@ -241,6 +241,33 @@ const RegisterPage = () => {
                                             <p className="text-slate-500">I confirm that all provided information is accurate and I agree to the agent code of conduct.</p>
                                         </div>
                                     </div>
+                                </>
+                            ) : role === 'partner' ? (
+                                <>
+                                    <Input label="Business Name" name="business_name" value={formData.business_name} onChange={handleChange} required />
+                                    <Input label="Owner Name" name="owner_name" value={formData.owner_name} onChange={handleChange} />
+                                    <Input label="Email" name="email" type="email" value={formData.email} onChange={handleChange} required />
+                                    <Input label="Password" name="password" type="password" value={formData.password} onChange={handleChange} required />
+
+                                    {/* Phone Input Custom Partner */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+                                        <div className="flex rounded-xl border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-primary-500/20 focus-within:border-primary-500">
+                                            <div className="bg-slate-50 px-3 py-3 text-slate-500 border-r border-slate-200 font-medium select-none min-w-[3.5rem] flex items-center justify-center">
+                                                {loadingIp ? '...' : countryCode}
+                                            </div>
+                                            <input
+                                                name="phoneLocal"
+                                                value={formData.phoneLocal}
+                                                onChange={handleChange}
+                                                className="flex-1 px-4 py-3 outline-none min-w-0"
+                                                placeholder="3XX XXXXXXX"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <Input label="Address" name="address" value={formData.address} onChange={handleChange} />
                                 </>
                             ) : (
                                 <>

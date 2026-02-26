@@ -31,6 +31,10 @@ import AdminCustomers from './pages/admin/Customers';
 import AgentPerformance from './pages/perfomance/Dashboard';
 import CategoryDetails from './pages/perfomance/CategoryDetails';
 
+// Partner Pages
+import PartnerDashboard from './pages/partner/Dashboard';
+
+
 
 // Placeholder Pages (Temporary)
 const NotFound = () => <div className="p-10 text-center">Page Not Found</div>;
@@ -106,7 +110,17 @@ function App() {
               </ProtectedRoute>
             } />
 
+            {/* Partner Routes */}
+            <Route path="/partner/*" element={
+              <ProtectedRoute allowedRoles={['partner']}>
+                <Routes>
+                  <Route path="dashboard" element={<PartnerDashboard />} />
+                </Routes>
+              </ProtectedRoute>
+            } />
+
             <Route path="*" element={<NotFound />} />
+
           </Routes>
         </AuthProvider>
       </Router>

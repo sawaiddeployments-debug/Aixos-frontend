@@ -68,6 +68,13 @@ export const AuthProvider = ({ children }) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         };
+      } else if (role === 'partner') {
+        url = 'http://localhost:5000/api/auth/register/partner';
+        options = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        };
       } else {
         return { success: false, error: 'Invalid role' };
       }

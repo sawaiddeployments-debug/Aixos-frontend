@@ -1,25 +1,30 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { X, Phone, Video, Search } from 'lucide-react';
+import { X, Phone, Video, Search, AlertCircle, Loader2 } from 'lucide-react';
 import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
-import { getMessages, sendMessage as sendChatMessage } from '../../api/chat';
+import { getMessages, sendMessage as sendChatMessage } from '../../api/chatApi'; // Corrected import
 import { useAuth } from '../../context/AuthContext';
 
 const ChatModal = ({ isOpen, onClose, queryId }) => {
     const [messages, setMessages] = useState([]);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoadingInitial, setIsLoadingInitial] = useState(false);
+    const [isSending, setIsSending] = useState(false);
+    const [error, setError] = useState(null);
     const [customer, setCustomer] = useState(null);
     const { user } = useAuth();
     const scrollRef = useRef(null);
     const pollingRef = useRef(null);
 
-    const fetchMessages = useCallback(async () => {
+    const fetchMessages = useCallback(async (isInitial = false) => {
         if (!queryId) return;
+        if (isInitial) setIsLoadingInitial(true);
+        setError(null);
+
         try {
             const data = await getMessages(queryId);
             setMessages(data);
 
-            // Try to find customer info from messages if not set
+            // Try to set some basic header info from messages if not manually provided
             if (!customer && data.length > 0) {
                 const customerMsg = data.find(m => m.sender_type === 'customer');
                 if (customerMsg) {
@@ -30,18 +35,21 @@ const ChatModal = ({ isOpen, onClose, queryId }) => {
                     });
                 }
             }
-        } catch (error) {
-            console.error('Failed to fetch messages:', error);
+        } catch (err) {
+            console.error('Failed to fetch messages:', err);
+            if (isInitial) setError('Could not load chat history. Please try again.');
+        } finally {
+            if (isInitial) setIsLoadingInitial(false);
         }
     }, [queryId, customer]);
 
     // Initial fetch and polling setup
     useEffect(() => {
         if (isOpen && queryId) {
-            fetchMessages();
+            fetchMessages(true);
 
-            // Set up polling every 5 seconds
-            pollingRef.current = setInterval(fetchMessages, 5000);
+            // Set up polling every 5 seconds for new messages
+            pollingRef.current = setInterval(() => fetchMessages(false), 5000);
         }
 
         return () => {
@@ -51,7 +59,7 @@ const ChatModal = ({ isOpen, onClose, queryId }) => {
         };
     }, [isOpen, queryId, fetchMessages]);
 
-    // Scroll to bottom when messages change
+    // Scroll to bottom when messages change or modal opens
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -59,15 +67,35 @@ const ChatModal = ({ isOpen, onClose, queryId }) => {
     }, [messages, isOpen]);
 
     const handleSendMessage = async (text) => {
-        if (!queryId) return;
-        setIsLoading(true);
+        if (!queryId || !text.trim()) return;
+
+        // Requirement 4: Optimistic UI update
+        const tempId = Date.now().toString();
+        const optimisticMsg = {
+            id: tempId,
+            extinguisher_id: queryId,
+            sender_id: user?.id,
+            sender_type: user?.role, // Using role for alignment as per requirement 5
+            content: text,
+            is_read: false,
+            created_at: new Date().toISOString(),
+            isOptimistic: true // Marker for UI
+        };
+
+        setMessages(prev => [...prev, optimisticMsg]);
+        setIsSending(true);
+
         try {
-            const newMsg = await sendChatMessage(queryId, text);
-            setMessages(prev => [...prev, newMsg]);
-        } catch (error) {
-            console.error('Failed to send message:', error);
+            const realMsg = await sendChatMessage(queryId, text);
+            // Replace optimistic message with the real one from backend
+            setMessages(prev => prev.map(m => m.id === tempId ? realMsg : m));
+        } catch (err) {
+            console.error('Failed to send message:', err);
+            // Remove the optimistic message on failure and show error
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+            setError('Failed to send message. Please try again.');
         } finally {
-            setIsLoading(false);
+            setIsSending(false);
         }
     };
 
@@ -92,10 +120,12 @@ const ChatModal = ({ isOpen, onClose, queryId }) => {
                                 }`} />
                         </div>
                         <div>
-                            <h3 className="font-bold text-slate-900 text-base sm:text-lg leading-tight">{customer?.name || `Loading Chat...`}</h3>
+                            <h3 className="font-bold text-slate-900 text-base sm:text-lg leading-tight">
+                                {customer?.name || (isLoadingInitial ? 'Connecting...' : `Extinguisher Chat`)}
+                            </h3>
                             <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
                                 <span className={`w-1.5 h-1.5 rounded-full ${customer?.status === 'online' ? 'bg-green-500' : 'bg-slate-300'}`} />
-                                {customer?.status === 'online' ? 'Active now' : customer?.lastSeen || 'Offline'}
+                                {customer?.status === 'online' ? 'Active now' : customer?.lastSeen || 'Status unknown'}
                             </p>
                         </div>
                     </div>
@@ -116,7 +146,7 @@ const ChatModal = ({ isOpen, onClose, queryId }) => {
                     </div>
                 </div>
 
-                {/* Search / Context Bar (Sub-header) */}
+                {/* Sub-header */}
                 <div className="px-6 py-2 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Extinguisher ID: #{queryId}</span>
                     <button className="text-slate-400 hover:text-slate-600 flex items-center gap-1">
@@ -128,9 +158,25 @@ const ChatModal = ({ isOpen, onClose, queryId }) => {
                 {/* Chat Area */}
                 <div
                     ref={scrollRef}
-                    className="flex-1 overflow-y-auto p-6 space-y-2 bg-[#F8FAFC] custom-scrollbar"
+                    className="flex-1 overflow-y-auto p-6 space-y-2 bg-[#F8FAFC] custom-scrollbar relative"
                 >
-                    {messages.length === 0 ? (
+                    {isLoadingInitial ? (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-3">
+                            <Loader2 className="animate-spin text-primary-500" size={32} />
+                            <p className="text-sm font-medium">Loading conversation...</p>
+                        </div>
+                    ) : error ? (
+                        <div className="h-full flex flex-col items-center justify-center text-red-500 p-6 text-center space-y-2">
+                            <AlertCircle size={32} />
+                            <p className="text-sm font-bold">{error}</p>
+                            <button
+                                onClick={() => fetchMessages(true)}
+                                className="text-xs bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                                Try Again
+                            </button>
+                        </div>
+                    ) : messages.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2">
                             <p className="text-sm">No messages yet</p>
                             <p className="text-xs">Start the conversation below</p>
@@ -143,7 +189,7 @@ const ChatModal = ({ isOpen, onClose, queryId }) => {
                 </div>
 
                 {/* Input Area */}
-                <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+                <ChatInput onSendMessage={handleSendMessage} isLoading={isSending} />
             </div>
         </div>
     );

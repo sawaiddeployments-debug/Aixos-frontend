@@ -1,5 +1,9 @@
 import client from './client';
 
+/**
+ * Fetch chat history for a specific extinguisher
+ * GET /api/extinguishers/:id/messages
+ */
 export const getMessages = async (extinguisherId) => {
     try {
         const response = await client.get(`/extinguishers/${extinguisherId}/messages`);
@@ -10,6 +14,10 @@ export const getMessages = async (extinguisherId) => {
     }
 };
 
+/**
+ * Send a new message
+ * POST /api/extinguishers/:id/messages
+ */
 export const sendMessage = async (extinguisherId, content) => {
     try {
         const response = await client.post(`/extinguishers/${extinguisherId}/messages`, {

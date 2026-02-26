@@ -37,8 +37,29 @@ const VisitForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [recordingIndex, setRecordingIndex] = useState(null);
   const [unitVoiceWarnings, setUnitVoiceWarnings] = useState({});
+  const [partners, setPartners] = useState([]);
+  const [loadingPartners, setLoadingPartners] = useState(false);
   const debounceTimers = useRef([]);
   const searchDebounceRef = useRef(null);
+
+  useEffect(() => {
+    const fetchPartners = async () => {
+      setLoadingPartners(true);
+      try {
+        const { data, error } = await supabase
+          .from('partners')
+          .select('id, business_name')
+          .eq('status', 'Active');
+        if (error) throw error;
+        setPartners(data || []);
+      } catch (err) {
+        console.error('Error fetching partners:', err);
+      } finally {
+        setLoadingPartners(false);
+      }
+    };
+    fetchPartners();
+  }, []);
 
 
   const FIRE_SYSTEMS = {
@@ -70,28 +91,6 @@ const VisitForm = () => {
     ]
   };
 
-  const PARTNER_DATA = {
-    'FireShield Services': {
-      sellers: ['Ahmed Traders', 'Safety Zone Karachi', 'FirePro Distributors'],
-      brands: ['Kidde', 'Amerex', 'Fike', 'Ansul']
-    },
-    'SafetyFirst Refilling': {
-      sellers: ['Al-Noor Safety', 'Karachi Fire Equip', 'SafeTech Supplies'],
-      brands: ['Safex', 'Minimex', 'Ceasefire', 'Kanex']
-    },
-    'Al-Faisal Fire Equipment': {
-      sellers: ['Faisal & Sons', 'Gulshan Traders', 'Defence Safety Shop'],
-      brands: ['Jactone', 'LPG', 'Firechief', 'Gloria']
-    },
-    'Guardian Fire Solutions': {
-      sellers: ['Guardian Mart', 'Elite Safety', 'ProFire Karachi'],
-      brands: ['Buckeye', 'Badger', 'Strike First', 'Ogniochron']
-    },
-    'United Fire Protection': {
-      sellers: ['United Safety Hub', 'North Karachi Traders', 'FireGuard Supplies'],
-      brands: ['Powerex', 'H3R Performance', 'Otis', 'Chubb']
-    },
-  };
 
   const FIRE_FIGHTING_CATEGORIES = {
     "Fire Fighting System": [
@@ -893,7 +892,7 @@ const VisitForm = () => {
                     status: item.mode === 'New Unit' ? 'New' : 'Maintained',
                     brand: item.brand || null,
                     seller: item.seller || null,
-                    partner: item.partner || null,
+                    partner_id: item.partner || null,
                     price: subPrice,
                     firefighting_system: sub.firefightingSystem || null,
                     fire_alarm_system: item.fireAlarmSystem || null,
@@ -924,7 +923,7 @@ const VisitForm = () => {
                 status: item.mode === 'Refill' ? 'Refilled' : 'Valid',
                 brand: item.brand || null,
                 seller: item.seller || null,
-                partner: item.partner || null,
+                partner_id: item.partner || null,
                 price: item.price || 180,
                 firefighting_system: item.firefightingSystem || null,
                 fire_alarm_system: item.fireAlarmSystem || null,
@@ -946,7 +945,9 @@ const VisitForm = () => {
         const flatRows = inventoryRows.flat();
 
         if (flatRows.length > 0) {
-          console.log("Final rows going to DB:", flatRows);
+          console.log("🚀 Payload Verification - Inventory Rows:", flatRows);
+          console.log("📌 Sample Row partner_id:", flatRows[0]?.partner_id);
+
           const { error: invError } = await supabase.from('extinguishers').insert(flatRows);
           if (invError) {
             console.error("Insert error:", invError);
@@ -1517,14 +1518,13 @@ const VisitForm = () => {
                             value={ext.partner || ''}
                             onChange={(e) => handleExtinguisherChange(index, 'partner', e.target.value)}
                             className="input-field py-2 text-sm"
+                            disabled={loadingPartners}
                           >
-                            <option value="">Select Partner</option>
-                            <option>FireShield Services</option>
-                            <option>SafetyFirst Refilling</option>
-                            <option>Al-Faisal Fire Equipment</option>
-                            <option>Guardian Fire Solutions</option>
-                            <option>United Fire Protection</option>
-                            <option>Other</option>
+                            <option value="">{loadingPartners ? 'Loading Partners...' : 'Select Partner'}</option>
+                            {partners.map(p => (
+                              <option key={p.id} value={p.id}>{p.business_name}</option>
+                            ))}
+                            <option value="Other">Other (Custom Partner)</option>
                           </select>
                           {ext.partner === 'Other' && (
                             <div className="mt-3 animate-fade-in">
@@ -1663,14 +1663,13 @@ const VisitForm = () => {
                           value={ext.partner}
                           onChange={(e) => handleExtinguisherChange(index, 'partner', e.target.value)}
                           className="input-field py-2 text-sm"
+                          disabled={loadingPartners}
                         >
-                          <option value="">Select Partner</option>
-                          <option>FireShield Services</option>
-                          <option>SafetyFirst Refilling</option>
-                          <option>Al-Faisal Fire Equipment</option>
-                          <option>Guardian Fire Solutions</option>
-                          <option>United Fire Protection</option>
-                          <option>Other</option>
+                          <option value="">{loadingPartners ? 'Loading Partners...' : 'Select Partner'}</option>
+                          {partners.map(p => (
+                            <option key={p.id} value={p.id}>{p.business_name}</option>
+                          ))}
+                          <option value="Other">Other (Custom Partner)</option>
                         </select>
 
                         {ext.partner === 'Other' && (
@@ -1851,14 +1850,13 @@ const VisitForm = () => {
                               value={ext.partner || ''}
                               onChange={(e) => handleExtinguisherChange(index, 'partner', e.target.value)}
                               className="input-field py-2 text-sm"
+                              disabled={loadingPartners}
                             >
-                              <option value="">Select Partner</option>
-                              <option>FireShield Services</option>
-                              <option>SafetyFirst Refilling</option>
-                              <option>Al-Faisal Fire Equipment</option>
-                              <option>Guardian Fire Solutions</option>
-                              <option>United Fire Protection</option>
-                              <option>Other</option>
+                              <option value="">{loadingPartners ? 'Loading Partners...' : 'Select Partner'}</option>
+                              {partners.map(p => (
+                                <option key={p.id} value={p.id}>{p.business_name}</option>
+                              ))}
+                              <option value="Other">Other (Custom Partner)</option>
                             </select>
                             {ext.partner === 'Other' && (
                               <div className="mt-3 animate-fade-in">
