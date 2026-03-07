@@ -3,9 +3,13 @@ import {
     FileText, ChevronLeft, MapPin,
     ClipboardCheck, Send, CheckCircle2,
     XCircle, Upload, DollarSign, User,
-    Info, Star
+    Info, Star, MessageCircle, FileCheck
 } from 'lucide-react';
 import DocumentManagement from './DocumentManagement';
+import InspectionUploadModal from './InspectionUploadModal';
+import ReportViewerSection from './ReportViewerSection';
+import ClientChatBox from './ClientChatBox';
+import { dummyMaintenanceData, dummyChatMessages } from '../data/maintenanceData';
 
 const QuotationModal = ({ isOpen, onClose, inquiry, onSubmit }) => {
     if (!isOpen) return null;
@@ -101,9 +105,10 @@ const QuotationModal = ({ isOpen, onClose, inquiry, onSubmit }) => {
 
 const MaintenanceTab = ({ data }) => {
     const [selectedInquiry, setSelectedInquiry] = useState(null);
-    const [stage, setStage] = useState('list'); // list, details, assessment, quoted
-    const [localData, setLocalData] = useState(data);
+    const [stage, setStage] = useState('list'); // list, details, assessment
+    const [localData, setLocalData] = useState(dummyMaintenanceData); // Use dummy data initially
     const [isQuotationOpen, setIsQuotationOpen] = useState(false);
+    const [isUploadOpen, setIsUploadOpen] = useState(false);
 
     const handleAccept = (id) => {
         setLocalData(prev => prev.map(inq => inq.id === id ? { ...inq, status: 'Accepted' } : inq));
@@ -120,6 +125,11 @@ const MaintenanceTab = ({ data }) => {
         setLocalData(prev => prev.map(inq => inq.id === id ? { ...inq, status: 'Assessment Done', assessment: assessmentData } : inq));
         setSelectedInquiry(prev => ({ ...prev, status: 'Assessment Done', assessment: assessmentData }));
         setStage('details');
+    };
+
+    const handleReportSubmit = (reportData) => {
+        setLocalData(prev => prev.map(inq => inq.id === selectedInquiry.id ? { ...inq, status: 'Inspection Report Submitted', report: reportData } : inq));
+        setSelectedInquiry(prev => ({ ...prev, status: 'Inspection Report Submitted', report: reportData }));
     };
 
     const handleQuotationSubmit = (quotationData) => {
@@ -215,7 +225,8 @@ const MaintenanceTab = ({ data }) => {
                                     {selectedInquiry.inquiryNo}
                                 </span>
                                 <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${selectedInquiry.status === 'Pending' ? 'bg-amber-100 text-amber-700' :
-                                    selectedInquiry.status === 'Accepted' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+                                    selectedInquiry.status === 'Accepted' ? 'bg-blue-100 text-blue-700' :
+                                        selectedInquiry.status === 'Inspection Report Submitted' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'
                                     }`}>
                                     {selectedInquiry.status}
                                 </span>
@@ -241,7 +252,7 @@ const MaintenanceTab = ({ data }) => {
                         <div className="space-y-8">
                             <div>
                                 <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                                    <Info size={18} className="text-primary-500" /> Maintenance Details
+                                    <Info size={18} className="text-primary-500" /> Inquiry Information
                                 </h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -265,7 +276,7 @@ const MaintenanceTab = ({ data }) => {
                                 <div className="space-y-8 animate-in slide-in-from-left-4 duration-500">
                                     <div>
                                         <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-emerald-600">
-                                            <CheckCircle2 size={18} /> Assessment Summary
+                                            <CheckCircle2 size={18} /> Site Assessment
                                         </h3>
                                         <div className="bg-emerald-50/50 border border-emerald-100 rounded-3xl p-6 space-y-4">
                                             <div>
@@ -285,10 +296,23 @@ const MaintenanceTab = ({ data }) => {
                                     <DocumentManagement />
                                 </div>
                             )}
+
+                            {selectedInquiry.status === 'Inspection Report Submitted' && (
+                                <ReportViewerSection report={selectedInquiry.report} />
+                            )}
+
+                            {(selectedInquiry.status === 'Inspection Report Submitted' || selectedInquiry.status === 'Quoted' || selectedInquiry.status === 'Approved' || selectedInquiry.status === 'Inquiry Closed') && (
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                        <MessageCircle size={18} className="text-primary-500" /> Client Comment Box
+                                    </h3>
+                                    <ClientChatBox initialMessages={dummyChatMessages} />
+                                </div>
+                            )}
                         </div>
 
                         {/* Actions */}
-                        <div className="flex flex-col justify-center gap-4 bg-slate-50/50 rounded-3xl p-8 border border-slate-100 border-dashed">
+                        <div className="flex flex-col justify-start gap-4 bg-slate-50/50 rounded-3xl p-8 border border-slate-100 border-dashed h-fit sticky top-0">
                             {selectedInquiry.status === 'Pending' ? (
                                 <>
                                     <h4 className="text-center font-bold text-slate-600 mb-2 uppercase tracking-widest text-xs">Awaiting Partner Action</h4>
@@ -312,23 +336,34 @@ const MaintenanceTab = ({ data }) => {
                                             <CheckCircle2 size={32} />
                                         </div>
                                         <h4 className="text-xl font-black text-slate-900 tracking-tight">Inquiry Accepted</h4>
-                                        <p className="text-sm text-slate-500">Proceed with the on-site technical assessment.</p>
+                                        <p className="text-sm text-slate-500">Choose how you want to proceed with the technical documentation.</p>
                                     </div>
                                     <button
                                         onClick={() => setStage('assessment')}
-                                        className="w-full bg-primary-500 hover:bg-primary-600 shadow-primary text-white font-black py-5 rounded-2xl transition-all flex items-center justify-center gap-3 text-lg"
+                                        className="w-full bg-white hover:bg-slate-50 border-2 border-primary-500 text-primary-500 font-black py-5 rounded-2xl transition-all flex items-center justify-center gap-3 text-lg"
                                     >
                                         <ClipboardCheck size={24} /> START SITE ASSESSMENT
                                     </button>
+                                    <div className="flex items-center gap-4 my-2">
+                                        <div className="h-[1px] flex-1 bg-slate-200"></div>
+                                        <span className="text-[10px] font-black text-slate-400 uppercase">OR</span>
+                                        <div className="h-[1px] flex-1 bg-slate-200"></div>
+                                    </div>
+                                    <button
+                                        onClick={() => setIsUploadOpen(true)}
+                                        className="w-full bg-primary-500 hover:bg-primary-600 shadow-primary text-white font-black py-5 rounded-2xl transition-all flex items-center justify-center gap-3 text-lg"
+                                    >
+                                        <Upload size={24} /> UPLOAD INSPECTION REPORT
+                                    </button>
                                 </>
-                            ) : selectedInquiry.status === 'Assessment Done' ? (
+                            ) : (selectedInquiry.status === 'Assessment Done' || selectedInquiry.status === 'Inspection Report Submitted') ? (
                                 <>
                                     <div className="text-center space-y-2 mb-6">
                                         <div className="w-16 h-16 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
                                             <DollarSign size={32} />
                                         </div>
-                                        <h4 className="text-xl font-black text-slate-900 tracking-tight">Assessment Complete</h4>
-                                        <p className="text-sm text-slate-500">Convert findings into a formal quotation.</p>
+                                        <h4 className="text-xl font-black text-slate-900 tracking-tight">Inspection Complete</h4>
+                                        <p className="text-sm text-slate-500">Convert findings into a formal quotation for the client.</p>
                                     </div>
                                     <button
                                         onClick={() => setIsQuotationOpen(true)}
@@ -369,8 +404,8 @@ const MaintenanceTab = ({ data }) => {
                                         onClick={() => {
                                             const remark = prompt("Add Remark to Close Inquiry:", "POC received");
                                             if (remark) {
-                                                setLocalData(prev => prev.map(inq => inq.id === selectedInquiry.id ? { ...inq, status: 'Closed', remarks: remark } : inq));
-                                                setSelectedInquiry(prev => ({ ...prev, status: 'Closed', remarks: remark }));
+                                                setLocalData(prev => prev.map(inq => inq.id === selectedInquiry.id ? { ...inq, status: 'Inquiry Closed', remarks: remark } : inq));
+                                                setSelectedInquiry(prev => ({ ...prev, status: 'Inquiry Closed', remarks: remark }));
                                                 alert("Inquiry Closed with Remark: " + remark);
                                             }
                                         }}
@@ -386,7 +421,7 @@ const MaintenanceTab = ({ data }) => {
                                     </div>
                                     <div>
                                         <h4 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic">Process Complete</h4>
-                                        <div className="mt-4 bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm inline-block">
+                                        <div className="mt-4 bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm inline-block w-full">
                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Final Remark</p>
                                             <p className="text-emerald-700 font-bold italic">"{selectedInquiry.remarks}"</p>
                                             <div className="mt-4 pt-4 border-t border-slate-50 flex flex-col items-center">
@@ -406,6 +441,13 @@ const MaintenanceTab = ({ data }) => {
                     onClose={() => setIsQuotationOpen(false)}
                     inquiry={selectedInquiry}
                     onSubmit={handleQuotationSubmit}
+                />
+
+                <InspectionUploadModal
+                    isOpen={isUploadOpen}
+                    onClose={() => setIsUploadOpen(false)}
+                    inquiry={selectedInquiry}
+                    onSubmit={handleReportSubmit}
                 />
             </div>
         );
@@ -444,7 +486,8 @@ const MaintenanceTab = ({ data }) => {
                                 <td className="px-6 py-4">
                                     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${inq.status === 'Pending' ? 'bg-amber-100 text-amber-700' :
                                         inq.status === 'Accepted' ? 'bg-blue-100 text-blue-700' :
-                                            inq.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+                                            inq.status === 'Inspection Report Submitted' ? 'bg-indigo-100 text-indigo-700' :
+                                                inq.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
                                         }`}>
                                         {inq.status}
                                     </span>
