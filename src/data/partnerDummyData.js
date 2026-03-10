@@ -126,18 +126,26 @@ export const refilledInquiries = [
 export const newUnitInquiries = [
     {
         id: 'NU-9001',
-        inquiryNo: 'NEW-551',
+        inquiryNo: 'INQ-551',
         customer: 'Modern Apartments',
-        unitType: 'ABC Dry Powder',
-        quantity: 15,
-        status: 'Pending'
+        unitType: 'Fire Extinguisher',
+        quantity: 3,
+        status: 'Pending',
+        items: [
+            { catalog_no: 'CAT-1001', product: 'Fire Extinguisher', systemPrice: 120 },
+            { catalog_no: 'CAT-1002', product: 'Fire Extinguisher', systemPrice: 120 },
+            { catalog_no: 'CAT-1003', product: 'Fire Extinguisher', systemPrice: 120 }
+        ]
     },
     {
         id: 'NU-9002',
-        inquiryNo: 'NEW-992',
+        inquiryNo: 'INQ-992',
         customer: 'Green Valley Residency',
         unitType: 'CO2 Extinguisher',
-        quantity: 5,
-        status: 'Quoted'
+        quantity: 1,
+        status: 'Quoted',
+        items: [
+            { catalog_no: 'CAT-2001', product: 'CO2 Extinguisher', systemPrice: 250 }
+        ]
     }
 ];

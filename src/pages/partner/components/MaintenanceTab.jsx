@@ -9,6 +9,7 @@ import DocumentManagement from './DocumentManagement';
 import InspectionUploadModal from './InspectionUploadModal';
 import ReportViewerSection from './ReportViewerSection';
 import ClientChatBox from './ClientChatBox';
+import MockChatModal from './MockChatModal';
 import { dummyMaintenanceData, dummyChatMessages } from '../data/maintenanceData';
 
 const QuotationModal = ({ isOpen, onClose, inquiry, onSubmit }) => {
@@ -109,6 +110,7 @@ const MaintenanceTab = ({ data }) => {
     const [localData, setLocalData] = useState(dummyMaintenanceData); // Use dummy data initially
     const [isQuotationOpen, setIsQuotationOpen] = useState(false);
     const [isUploadOpen, setIsUploadOpen] = useState(false);
+    const [isChatOpen, setIsChatOpen] = useState(false);
 
     const handleAccept = (id) => {
         setLocalData(prev => prev.map(inq => inq.id === id ? { ...inq, status: 'Accepted' } : inq));
@@ -232,9 +234,17 @@ const MaintenanceTab = ({ data }) => {
                                 </span>
                             </div>
                             <h1 className="text-3xl font-display font-black text-slate-900">{selectedInquiry.customerName}</h1>
-                            <p className="text-slate-500 flex items-center gap-2 mt-1 font-medium">
-                                <MapPin size={16} /> {selectedInquiry.location}
-                            </p>
+                            <div className="flex items-center gap-4 mt-1">
+                                <p className="text-slate-500 flex items-center gap-2 font-medium">
+                                    <MapPin size={16} /> {selectedInquiry.location}
+                                </p>
+                                <button
+                                    onClick={() => setIsChatOpen(true)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg shadow-slate-200"
+                                >
+                                    <MessageCircle size={14} /> Message Customer
+                                </button>
+                            </div>
                         </div>
                         <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
                             <div className="p-2 bg-primary-50 rounded-xl text-primary-500">
@@ -448,6 +458,13 @@ const MaintenanceTab = ({ data }) => {
                     onClose={() => setIsUploadOpen(false)}
                     inquiry={selectedInquiry}
                     onSubmit={handleReportSubmit}
+                />
+
+                <MockChatModal
+                    isOpen={isChatOpen}
+                    onClose={() => setIsChatOpen(false)}
+                    customerName={selectedInquiry?.customerName}
+                    inquiryNo={selectedInquiry?.inquiryNo}
                 />
             </div>
         );

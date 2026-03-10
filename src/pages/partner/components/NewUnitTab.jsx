@@ -1,7 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Package, MapPin, Send } from 'lucide-react';
+import NewUnitDetailModal from './NewUnitDetailModal';
 
 const NewUnitTab = ({ data }) => {
+    const [selectedInquiry, setSelectedInquiry] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const handleView = (inquiry) => {
+        setSelectedInquiry(inquiry);
+        setIsModalOpen(true);
+    };
+
     return (
         <div className="bg-white rounded-3xl border border-slate-100 shadow-soft overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="overflow-x-auto">
@@ -41,7 +50,10 @@ const NewUnitTab = ({ data }) => {
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    <button className="px-6 py-2 bg-slate-900 text-white hover:bg-primary-600 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-slate-200">
+                                    <button
+                                        onClick={() => handleView(inq)}
+                                        className="px-6 py-2 bg-slate-900 text-white hover:bg-primary-600 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-slate-200"
+                                    >
                                         View
                                     </button>
                                 </td>
@@ -58,6 +70,12 @@ const NewUnitTab = ({ data }) => {
                     <p className="text-slate-500 font-medium">No new unit inquiries found.</p>
                 </div>
             )}
+
+            <NewUnitDetailModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                inquiry={selectedInquiry}
+            />
         </div>
     );
 };

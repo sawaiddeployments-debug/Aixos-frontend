@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import {
     Cylinder, Truck, User,
     ArrowRight, CheckCircle2, XCircle,
-    Info, DollarSign, Split
+    Info, DollarSign, Split, MessageCircle
 } from 'lucide-react';
+import MockChatModal from './MockChatModal';
 
 const RefilledTab = ({ data }) => {
     const [localData, setLocalData] = useState(data);
     const [processInquiry, setProcessInquiry] = useState(null); // The inquiry being partially accepted/rejected
     const [acceptedCount, setAcceptedCount] = useState(0);
+    const [isChatOpen, setIsChatOpen] = useState(false);
 
     const handleProcess = (inq) => {
         setProcessInquiry(inq);
@@ -37,7 +39,15 @@ const RefilledTab = ({ data }) => {
                     <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center">
                         <div>
                             <h2 className="text-2xl font-black text-slate-900">Process Refill Request</h2>
-                            <p className="text-slate-500 font-medium">Inquiry: {processInquiry.inquiryNo} | {processInquiry.customerName}</p>
+                            <div className="flex items-center gap-4 mt-1">
+                                <p className="text-slate-500 font-medium whitespace-nowrap">Inquiry: {processInquiry.inquiryNo} | {processInquiry.customerName}</p>
+                                <button
+                                    onClick={() => setIsChatOpen(true)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg shadow-slate-200"
+                                >
+                                    <MessageCircle size={14} /> Message Customer
+                                </button>
+                            </div>
                         </div>
                         <button onClick={() => setProcessInquiry(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400"><XCircle size={24} /></button>
                     </div>
@@ -176,8 +186,8 @@ const RefilledTab = ({ data }) => {
                                 <td className="px-6 py-4">
                                     <div className="flex flex-col gap-1">
                                         <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider w-fit ${inq.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
-                                                inq.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
-                                                    inq.status === 'Partially Accepted' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'
+                                            inq.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
+                                                inq.status === 'Partially Accepted' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'
                                             }`}>
                                             {inq.status}
                                         </span>
@@ -200,6 +210,12 @@ const RefilledTab = ({ data }) => {
                     </tbody>
                 </table>
             </div>
+            <MockChatModal
+                isOpen={isChatOpen}
+                onClose={() => setIsChatOpen(false)}
+                customerName={processInquiry?.customerName}
+                inquiryNo={processInquiry?.inquiryNo}
+            />
         </div>
     );
 };

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { FileText, ChevronLeft, Calendar, MapPin, Tag, User } from 'lucide-react';
+import { FileText, ChevronLeft, Calendar, MapPin, Tag, User, MessageCircle } from 'lucide-react';
 import DocumentManagement from './DocumentManagement';
+import MockChatModal from './MockChatModal';
 
 const ValidationTab = ({ data }) => {
     const [selectedInquiry, setSelectedInquiry] = useState(null);
+    const [isChatOpen, setIsChatOpen] = useState(false);
 
     if (selectedInquiry) {
         return (
@@ -23,9 +25,17 @@ const ValidationTab = ({ data }) => {
                                     Inquiry {selectedInquiry.id}
                                 </span>
                                 <h1 className="text-3xl font-display font-black text-slate-900">{selectedInquiry.clientName}</h1>
-                                <p className="text-slate-500 flex items-center gap-2 mt-2">
-                                    <MapPin size={16} /> {selectedInquiry.details.location}
-                                </p>
+                                <div className="flex items-center gap-4 mt-2">
+                                    <p className="text-slate-500 flex items-center gap-2">
+                                        <MapPin size={16} /> {selectedInquiry.details.location}
+                                    </p>
+                                    <button
+                                        onClick={() => setIsChatOpen(true)}
+                                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg shadow-slate-200"
+                                    >
+                                        <MessageCircle size={14} /> Message Customer
+                                    </button>
+                                </div>
                             </div>
                             <div className="text-right">
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Created Date</p>
@@ -92,7 +102,7 @@ const ValidationTab = ({ data }) => {
                                 </div>
                             </div>
 
-                            <DocumentManagement />
+                            {/* <DocumentManagement /> */}
                         </div>
 
                         <div className="space-y-6">
@@ -105,6 +115,13 @@ const ValidationTab = ({ data }) => {
                         </div>
                     </div>
                 </div>
+
+                <MockChatModal
+                    isOpen={isChatOpen}
+                    onClose={() => setIsChatOpen(false)}
+                    customerName={selectedInquiry.clientName}
+                    inquiryNo={selectedInquiry.id}
+                />
             </div>
         );
     }

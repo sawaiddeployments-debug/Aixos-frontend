@@ -221,7 +221,8 @@ const VisitForm = () => {
           firefightingSystem: item.firefightingSystem === 'Other' ? item.customFirefightingSystem : item.firefightingSystem,
           material: item.material === 'Other' ? item.customMaterial : item.material,
           unit: item.unit || 'Pieces',
-          quantity: item.quantity || 1
+          quantity: item.quantity || 1,
+          catalog_no: `CAT-${Math.floor(1000 + Math.random() * 9000)}`
         };
 
         return {
@@ -902,6 +903,7 @@ const VisitForm = () => {
                     maintenance_unit_photo_url: photoUrl,
                     is_sub_unit: true,
                     unit: sub.unit || 'Pieces',
+                    catalog_no: sub.catalog_no || null,
                     query_status: 'Active'
                   };
                   rows.push(subRow);
