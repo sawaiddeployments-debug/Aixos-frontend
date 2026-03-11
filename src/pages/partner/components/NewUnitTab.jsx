@@ -18,9 +18,10 @@ const NewUnitTab = ({ data }) => {
                     <thead>
                         <tr className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 bg-slate-50/50">
                             <th className="px-6 py-4">Inquiry No</th>
+                            <th className="px-6 py-4">Product</th>
+                            <th className="px-6 py-4">Short Description</th>
                             <th className="px-6 py-4">Customer</th>
-                            <th className="px-6 py-4">Unit Type</th>
-                            <th className="px-6 py-4">Quantity</th>
+                            <th className="px-6 py-4">Quantity Requested</th>
                             <th className="px-6 py-4">Status</th>
                             <th className="px-6 py-4 text-right">Action</th>
                         </tr>
@@ -30,9 +31,6 @@ const NewUnitTab = ({ data }) => {
                             <tr key={inq.id} className="hover:bg-slate-50/50 transition-colors group">
                                 <td className="px-6 py-4 font-black text-primary-600 tracking-tighter">{inq.inquiryNo}</td>
                                 <td className="px-6 py-4">
-                                    <p className="font-bold text-slate-900">{inq.customer}</p>
-                                </td>
-                                <td className="px-6 py-4">
                                     <div className="flex items-center gap-2">
                                         <div className="p-2 bg-primary-50 rounded-xl text-primary-500">
                                             <Package size={16} />
@@ -40,7 +38,11 @@ const NewUnitTab = ({ data }) => {
                                         <span className="font-bold text-slate-700">{inq.unitType}</span>
                                     </div>
                                 </td>
+                                <td className="px-6 py-4 font-medium text-slate-500 italic">{inq.shortDescription}</td>
                                 <td className="px-6 py-4">
+                                    <p className="font-bold text-slate-900">{inq.customer}</p>
+                                </td>
+                                <td className="px-6 py-4 text-center">
                                     <span className="text-xl font-black text-slate-900">{inq.quantity}</span>
                                 </td>
                                 <td className="px-6 py-4">

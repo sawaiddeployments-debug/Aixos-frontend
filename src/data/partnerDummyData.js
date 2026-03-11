@@ -123,18 +123,87 @@ export const refilledInquiries = [
     }
 ];
 
+export const productCatalog = [
+    {
+        catalog_no: 'CAT-1001',
+        productName: 'Standard ABC Powder Extinguisher',
+        category: 'Fire Safety',
+        capacity: '6 KG',
+        type: 'Dry Powder (ABC)',
+        manufacturer: 'ABC Safety Solutions',
+        specs: {
+            cylinderMaterial: 'High-Grade Steel',
+            safetyCertification: 'UL Listed / EN3-7',
+            description: 'The ABC fire extinguisher is effective against Class A (solids), Class B (liquids), and Class C (gases) fires. It is the most versatile extinguisher for homes and offices.'
+        }
+    },
+    {
+        catalog_no: 'CAT-1002',
+        productName: 'Fire Extinguisher',
+        category: 'Fire Safety',
+        capacity: '5 KG',
+        type: 'CO2',
+        manufacturer: 'PureGuard Systems',
+        specs: {
+            cylinderMaterial: 'Aluminum',
+            safetyCertification: 'BSI Kitemarked',
+            description: 'Carbon Dioxide extinguishers are ideal for electrical fires and flammable liquid fires. They leave no residue, making them perfect for server rooms and kitchens.'
+        }
+    },
+    {
+        catalog_no: 'CAT-1003',
+        productName: 'Eco-Foam Fire Extinguisher',
+        category: 'Fire Safety',
+        capacity: '9 Liters',
+        type: 'AFFF Foam',
+        manufacturer: 'EcoFire Tech',
+        specs: {
+            cylinderMaterial: 'Stainless Steel',
+            safetyCertification: 'LPCB Approved',
+            description: 'Foam extinguishers provide a fast flame knockdown and have a cooling effect. They are suitable for Class A and Class B fires.'
+        }
+    },
+    {
+        catalog_no: 'CAT-2001',
+        productName: 'Marine Grade CO2 Extinguisher',
+        category: 'Fire Safety',
+        capacity: '2 KG',
+        type: 'CO2',
+        manufacturer: 'SeaSafe Equipment',
+        specs: {
+            cylinderMaterial: 'Aluminum',
+            safetyCertification: 'MED Approved',
+            description: 'Specifically designed for marine environments, this CO2 extinguisher is corrosion-resistant and highly effective for small electrical fires on boats.'
+        }
+    },
+    {
+        catalog_no: 'CAT-2002',
+        productName: 'Industrial High-Pressure CO2',
+        category: 'Fire Safety',
+        capacity: '5 KG',
+        type: 'CO2',
+        manufacturer: 'PureGuard Systems',
+        specs: {
+            cylinderMaterial: 'High-Grade Steel',
+            safetyCertification: 'BSI Kitemarked',
+            description: 'A heavy-duty CO2 extinguisher built for industrial server rooms and manufacturing plants. Provides rapid cooling and non-conductive suppression.'
+        }
+    }
+];
+
 export const newUnitInquiries = [
     {
         id: 'NU-9001',
         inquiryNo: 'INQ-551',
         customer: 'Modern Apartments',
         unitType: 'Fire Extinguisher',
-        quantity: 3,
+        shortDescription: 'Safety Cylinder',
+        quantity: 10,
         status: 'Pending',
         items: [
             { catalog_no: 'CAT-1001', product: 'Fire Extinguisher', systemPrice: 120 },
-            { catalog_no: 'CAT-1002', product: 'Fire Extinguisher', systemPrice: 120 },
-            { catalog_no: 'CAT-1003', product: 'Fire Extinguisher', systemPrice: 120 }
+            { catalog_no: 'CAT-1002', product: 'Fire Extinguisher', systemPrice: 150 },
+            { catalog_no: 'CAT-1003', product: 'Fire Extinguisher', systemPrice: 180 }
         ]
     },
     {
@@ -142,10 +211,23 @@ export const newUnitInquiries = [
         inquiryNo: 'INQ-992',
         customer: 'Green Valley Residency',
         unitType: 'CO2 Extinguisher',
-        quantity: 1,
+        shortDescription: 'Server Room Safety',
+        quantity: 5,
         status: 'Quoted',
         items: [
-            { catalog_no: 'CAT-2001', product: 'CO2 Extinguisher', systemPrice: 250 }
+            { catalog_no: 'CAT-2002', product: 'CO2 Extinguisher', systemPrice: 250 }
+        ]
+    },
+    {
+        id: 'NU-9003',
+        inquiryNo: 'INQ-1024',
+        customer: 'Blue Square Tech',
+        unitType: 'Foam Extinguisher',
+        shortDescription: 'Warehouse Protection',
+        quantity: 20,
+        status: 'Pending',
+        items: [
+            { catalog_no: 'CAT-1003', product: 'Eco-Foam Extinguisher', systemPrice: 180 }
         ]
     }
 ];
