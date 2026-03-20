@@ -104,9 +104,9 @@ const QuotationModal = ({ isOpen, onClose, inquiry, onSubmit }) => {
     );
 };
 
-const MaintenanceTab = ({ data }) => {
-    const [selectedInquiry, setSelectedInquiry] = useState(null);
-    const [stage, setStage] = useState('list'); // list, details, assessment
+const MaintenanceTab = ({ data, initialInquiry }) => {
+    const [selectedInquiry, setSelectedInquiry] = useState(initialInquiry || null);
+    const [stage, setStage] = useState(initialInquiry ? 'details' : 'list');
     const [localData, setLocalData] = useState(dummyMaintenanceData); // Use dummy data initially
     const [isQuotationOpen, setIsQuotationOpen] = useState(false);
     const [isUploadOpen, setIsUploadOpen] = useState(false);

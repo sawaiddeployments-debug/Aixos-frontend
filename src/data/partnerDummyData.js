@@ -134,12 +134,25 @@ export const productCatalog = [
         specs: {
             cylinderMaterial: 'High-Grade Steel',
             safetyCertification: 'UL Listed / EN3-7',
-            description: 'The ABC fire extinguisher is effective against Class A (solids), Class B (liquids), and Class C (gases) fires. It is the most versatile extinguisher for homes and offices.'
+            description: 'The ABC fire extinguisher is effective against Class A (solids), Class B (liquids), and Class C (gases) fires.'
+        }
+    },
+    {
+        catalog_no: 'CAT-1001-B',
+        productName: 'Standard ABC Powder Extinguisher',
+        category: 'Fire Safety',
+        capacity: '4 KG',
+        type: 'Dry Powder (ABC)',
+        manufacturer: 'ABC Safety Solutions',
+        specs: {
+            cylinderMaterial: 'High-Grade Steel',
+            safetyCertification: 'UL Listed',
+            description: 'Compact version of the standard ABC powder extinguisher.'
         }
     },
     {
         catalog_no: 'CAT-1002',
-        productName: 'Fire Extinguisher',
+        productName: 'Classic CO2 Extinguisher',
         category: 'Fire Safety',
         capacity: '5 KG',
         type: 'CO2',
@@ -147,12 +160,25 @@ export const productCatalog = [
         specs: {
             cylinderMaterial: 'Aluminum',
             safetyCertification: 'BSI Kitemarked',
-            description: 'Carbon Dioxide extinguishers are ideal for electrical fires and flammable liquid fires. They leave no residue, making them perfect for server rooms and kitchens.'
+            description: 'Carbon Dioxide extinguishers are ideal for electrical fires and flammable liquid fires.'
+        }
+    },
+    {
+        catalog_no: 'CAT-1002-V2',
+        productName: 'Classic CO2 Extinguisher',
+        category: 'Fire Safety',
+        capacity: '2 KG',
+        type: 'CO2',
+        manufacturer: 'PureGuard Systems',
+        specs: {
+            cylinderMaterial: 'Aluminum',
+            safetyCertification: 'BSI Kitemarked',
+            description: 'Lightweight CO2 extinguisher for small server cabinets.'
         }
     },
     {
         catalog_no: 'CAT-1003',
-        productName: 'Eco-Foam Fire Extinguisher',
+        productName: 'Eco-Foam Extinguisher',
         category: 'Fire Safety',
         capacity: '9 Liters',
         type: 'AFFF Foam',
@@ -160,33 +186,7 @@ export const productCatalog = [
         specs: {
             cylinderMaterial: 'Stainless Steel',
             safetyCertification: 'LPCB Approved',
-            description: 'Foam extinguishers provide a fast flame knockdown and have a cooling effect. They are suitable for Class A and Class B fires.'
-        }
-    },
-    {
-        catalog_no: 'CAT-2001',
-        productName: 'Marine Grade CO2 Extinguisher',
-        category: 'Fire Safety',
-        capacity: '2 KG',
-        type: 'CO2',
-        manufacturer: 'SeaSafe Equipment',
-        specs: {
-            cylinderMaterial: 'Aluminum',
-            safetyCertification: 'MED Approved',
-            description: 'Specifically designed for marine environments, this CO2 extinguisher is corrosion-resistant and highly effective for small electrical fires on boats.'
-        }
-    },
-    {
-        catalog_no: 'CAT-2002',
-        productName: 'Industrial High-Pressure CO2',
-        category: 'Fire Safety',
-        capacity: '5 KG',
-        type: 'CO2',
-        manufacturer: 'PureGuard Systems',
-        specs: {
-            cylinderMaterial: 'High-Grade Steel',
-            safetyCertification: 'BSI Kitemarked',
-            description: 'A heavy-duty CO2 extinguisher built for industrial server rooms and manufacturing plants. Provides rapid cooling and non-conductive suppression.'
+            description: 'Foam extinguishers provide a fast flame knockdown and have a cooling effect.'
         }
     }
 ];
@@ -196,38 +196,49 @@ export const newUnitInquiries = [
         id: 'NU-9001',
         inquiryNo: 'INQ-551',
         customer: 'Modern Apartments',
-        unitType: 'Fire Extinguisher',
-        shortDescription: 'Safety Cylinder',
-        quantity: 10,
+        unitType: 'Mixed Safety Pack',
+        shortDescription: 'Residential Protection',
+        quantity: 15,
         status: 'Pending',
         items: [
-            { catalog_no: 'CAT-1001', product: 'Fire Extinguisher', systemPrice: 120 },
-            { catalog_no: 'CAT-1002', product: 'Fire Extinguisher', systemPrice: 150 },
-            { catalog_no: 'CAT-1003', product: 'Fire Extinguisher', systemPrice: 180 }
+            { 
+                id: 'ITEM-1', 
+                catalog_no: 'CAT-1001', 
+                product: 'Standard ABC Powder Extinguisher', 
+                description: '6KG Cylinder',
+                unit: 'Pieces',
+                unitPrice: 120,
+                quantity: 5 
+            },
+            { 
+                id: 'ITEM-2', 
+                catalog_no: 'CAT-1002', 
+                product: 'Classic CO2 Extinguisher', 
+                description: '5KG Aluminum',
+                unit: 'Pieces',
+                unitPrice: 250,
+                quantity: 10 
+            }
         ]
     },
     {
         id: 'NU-9002',
         inquiryNo: 'INQ-992',
         customer: 'Green Valley Residency',
-        unitType: 'CO2 Extinguisher',
+        unitType: 'Classic CO2 Extinguisher',
         shortDescription: 'Server Room Safety',
         quantity: 5,
         status: 'Quoted',
         items: [
-            { catalog_no: 'CAT-2002', product: 'CO2 Extinguisher', systemPrice: 250 }
-        ]
-    },
-    {
-        id: 'NU-9003',
-        inquiryNo: 'INQ-1024',
-        customer: 'Blue Square Tech',
-        unitType: 'Foam Extinguisher',
-        shortDescription: 'Warehouse Protection',
-        quantity: 20,
-        status: 'Pending',
-        items: [
-            { catalog_no: 'CAT-1003', product: 'Eco-Foam Extinguisher', systemPrice: 180 }
+            { 
+                id: 'ITEM-3', 
+                catalog_no: 'CAT-1002', 
+                product: 'Classic CO2 Extinguisher', 
+                description: '5KG Aluminum',
+                unit: 'Pieces',
+                unitPrice: 250,
+                quantity: 5 
+            }
         ]
     }
 ];

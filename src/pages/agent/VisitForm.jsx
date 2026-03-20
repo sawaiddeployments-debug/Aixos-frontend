@@ -754,6 +754,21 @@ const VisitForm = () => {
   };
 
   const handleSubmit = async () => {
+    const partnerValues = extinguishers.map(ext => {
+      if (ext.partner === 'Other') {
+        return ext.customPartner?.trim() ? `custom:${ext.customPartner.trim().toLowerCase()}` : null;
+      }
+      return ext.partner || null;
+    }).filter(p => p !== null);
+
+    const uniquePartners = [...new Set(partnerValues)];
+
+    if (uniquePartners.length > 1) {
+      alert("👉 All items must be assigned to the same partner");
+      return;
+    }
+
+
     setLoading(true);
     try {
       let finalCustId = formData.customerId;
@@ -857,104 +872,118 @@ const VisitForm = () => {
       }
 
 
-      // 4. Insert Inventory
+      // 4. Create Inquiry Metadata
+      const inquiryNo = `INQ-${Math.floor(100000 + Math.random() * 900000)}`;
+      const inquiryType = extinguishers[0]?.mode || 'General';
+
+      // 5. Build Unified Data
       if (extinguishers.length > 0) {
-        const inventoryRows = await Promise.all(
-          extinguishers.flatMap(async (item, idx) => {
-            const rows = [];
+        // A. Insert ONE Parent Extinguisher Record for the entire visit
+        const parentPayload = {
+          customer_id: finalCustId,
+          visit_id: visitId,
+          inquiry_no: inquiryNo,
+          inquiry_type: inquiryType,
+          query_status: 'Active',
+          // Store first block's basic info for quick-view searching
+          type: extinguishers[0].material || extinguishers[0].type || null,
+          capacity: extinguishers[0].capacity || null,
+          status: extinguishers[0].mode === 'New Unit' ? 'New' : (extinguishers[0].mode === 'Refill' ? 'Refilled' : (extinguishers[0].mode === 'Validation' ? 'Valid' : 'Maintained'))
+        };
 
-            let voiceUrl = null;
-            let photoUrl = null;
-            if (item.mode === 'Maintenance') {
-              if (item.maintenanceVoiceNote) {
-                voiceUrl = await uploadMaintenanceVoice(item.maintenanceVoiceNote, idx);
-              }
-              if (item.maintenanceUnitPhoto) {
-                photoUrl = await uploadMaintenancePhoto(item.maintenanceUnitPhoto, idx);
-              }
+        const { data: parentData, error: parentError } = await supabase
+          .from('extinguishers')
+          .insert([parentPayload])
+          .select();
+
+        if (parentError) throw parentError;
+        const parentId = parentData[0].id;
+
+        // B. Collect ALL items from all blocks
+        let globalSerialNo = 1;
+        const allItemsPayload = [];
+
+        for (let i = 0; i < extinguishers.length; i++) {
+          const item = extinguishers[i];
+          const idx = i;
+
+          let voiceUrl = null;
+          let photoUrl = null;
+          if (item.mode === 'Maintenance') {
+            if (item.maintenanceVoiceNote) {
+              voiceUrl = await uploadMaintenanceVoice(item.maintenanceVoiceNote, idx);
             }
+            if (item.maintenanceUnitPhoto) {
+              photoUrl = await uploadMaintenancePhoto(item.maintenanceUnitPhoto, idx);
+            }
+          }
 
-            if (item.mode === 'New Unit' || item.mode === 'Maintenance') {
-              // New Unit aur Maintenance dono ke liye sirf sub-units rows banao
-              if (item.newUnits?.length > 0) {
-                item.newUnits.forEach((sub) => {
-                  let subPrice = 180;
-                  const ffItem = FIRE_SYSTEMS.firefighting.find(it => it.name === sub.firefightingSystem);
-                  if (ffItem) subPrice += ffItem.price;
+          // 1. Map the Main Unit of this block (EXCEPT for 'New Unit' mode which uses sub-units)
+          if (item.mode !== 'New Unit' && (item.material || item.firefightingSystem || item.type)) {
+            allItemsPayload.push({
+              extinguisher_id: parentId,
+              customer_id: finalCustId,
+              serial_no: globalSerialNo++,
+              type: item.type || null,
+              system_type: item.material || null,
+              capacity: item.capacity || null,
+              quantity: item.quantity || 1,
+              price: item.price || 180,
+              unit: item.unit || 'Pieces',
+              firefighting_system: item.firefightingSystem || null,
+              fire_alarm_system: item.fireAlarmSystem || null,
+              pump_type: item.pumpType || null,
+              condition: item.condition || 'Good',
+              status: item.mode === 'New Unit' ? 'New' : (item.mode === 'Refill' ? 'Refilled' : (item.mode === 'Validation' ? 'Valid' : 'Maintained')),
+              catalog_no: item.catalog_no || null,
+              maintenance_notes: item.maintenanceNotes || null,
+              maintenance_voice_url: voiceUrl,
+              maintenance_unit_photo_url: photoUrl,
+              is_sub_unit: false,
+              query_status: 'Active'
+            });
+          }
 
-                  const subRow = {
-                    customer_id: finalCustId,
-                    visit_id: visitId,
-                    type: sub.material || null,      // ← Store Material in type
-                    capacity: item.capacity || null,
-                    quantity: sub.quantity || 1,
-                    expiry_date: item.expiryDate || null,
-                    condition: item.condition || 'Good',
-                    status: item.mode === 'New Unit' ? 'New' : 'Maintained',
-                    brand: item.brand || null,
-                    seller: item.seller || null,
-                    partner_id: item.partner || null,
-                    price: subPrice,
-                    firefighting_system: sub.firefightingSystem || null,
-                    fire_alarm_system: item.fireAlarmSystem || null,
-                    pump_type: item.pumpType || null,
-                    maintenance_notes: item.maintenanceNotes || null,
-                    maintenance_voice_url: voiceUrl,
-                    maintenance_unit_photo_url: photoUrl,
-                    is_sub_unit: true,
-                    unit: sub.unit || 'Pieces',
-                    catalog_no: sub.catalog_no || null,
-                    query_status: 'Active'
-                  };
-                  rows.push(subRow);
-                });
-              } else {
-                // Agar sub-unit nahi add kiya to warning
-                console.warn(`${item.mode} mode mein koi item add nahi kiya gaya`);
-              }
-            } else {
-              // Validation aur Refill ke liye normal parent row
-              const mainRow = {
+          // 2. Map Sub-units of this block
+          if (item.newUnits?.length > 0) {
+            item.newUnits.forEach((sub) => {
+              let subPrice = 180;
+              const ffItem = FIRE_SYSTEMS.firefighting.find(it => it.name === sub.firefightingSystem);
+              if (ffItem) subPrice += ffItem.price;
+
+              allItemsPayload.push({
+                extinguisher_id: parentId,
                 customer_id: finalCustId,
-                visit_id: visitId,
-                type: item.type || null,
+                serial_no: globalSerialNo++,
+                type: item.type || null,         // Block's extinguisher type
+                system_type: sub.material || null, // Sub-unit's specific system/material
                 capacity: item.capacity || null,
-                quantity: item.quantity || 1,
-                expiry_date: item.expiryDate || null,
-                condition: item.condition || null,
-                status: item.mode === 'Refill' ? 'Refilled' : 'Valid',
-                brand: item.brand || null,
-                seller: item.seller || null,
-                partner_id: item.partner || null,
-                price: item.price || 180,
-                firefighting_system: item.firefightingSystem || null,
+                quantity: sub.quantity || 1,
+                price: subPrice,
+                unit: sub.unit || 'Pieces',
+                firefighting_system: sub.firefightingSystem || null,
                 fire_alarm_system: item.fireAlarmSystem || null,
                 pump_type: item.pumpType || null,
+                condition: item.condition || 'Good',
+                status: 'New',
+                catalog_no: sub.catalog_no || null,
                 maintenance_notes: item.maintenanceNotes || null,
                 maintenance_voice_url: voiceUrl,
                 maintenance_unit_photo_url: photoUrl,
-                is_sub_unit: false,
-                unit: item.unit || null,
+                is_sub_unit: true,
                 query_status: 'Active'
-              };
-              rows.push(mainRow);
-            }
-
-            return rows;
-          })
-        );
-
-        const flatRows = inventoryRows.flat();
-
-        if (flatRows.length > 0) {
-          console.log("🚀 Payload Verification - Inventory Rows:", flatRows);
-          console.log("📌 Sample Row partner_id:", flatRows[0]?.partner_id);
-
-          const { error: invError } = await supabase.from('extinguishers').insert(flatRows);
-          if (invError) {
-            console.error("Insert error:", invError);
-            throw invError;
+              });
+            });
           }
+        }
+
+        // C. Batch Insert all units into inquiry_items
+        if (allItemsPayload.length > 0) {
+          const { error: itemsError } = await supabase
+            .from('inquiry_items')
+            .insert(allItemsPayload);
+
+          if (itemsError) throw itemsError;
         }
       }
       navigate('/agent/dashboard');

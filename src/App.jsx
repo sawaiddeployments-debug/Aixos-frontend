@@ -33,6 +33,7 @@ import CategoryDetails from './pages/perfomance/CategoryDetails';
 
 // Partner Pages
 import PartnerDashboard from './pages/partner/Dashboard';
+import InquiryItemsList from './pages/partner/InquiryItemsList';
 
 
 
@@ -115,6 +116,7 @@ function App() {
               <ProtectedRoute allowedRoles={['partner']}>
                 <Routes>
                   <Route path="dashboard" element={<PartnerDashboard />} />
+                  <Route path="inquiry/:id" element={<InquiryItemsList />} />
                 </Routes>
               </ProtectedRoute>
             } />

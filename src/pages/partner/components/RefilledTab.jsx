@@ -6,10 +6,10 @@ import {
 } from 'lucide-react';
 import MockChatModal from './MockChatModal';
 
-const RefilledTab = ({ data }) => {
+const RefilledTab = ({ data, initialInquiry }) => {
     const [localData, setLocalData] = useState(data);
-    const [processInquiry, setProcessInquiry] = useState(null); // The inquiry being partially accepted/rejected
-    const [acceptedCount, setAcceptedCount] = useState(0);
+    const [processInquiry, setProcessInquiry] = useState(initialInquiry || null);
+    const [acceptedCount, setAcceptedCount] = useState(initialInquiry ? initialInquiry.totalCylinders : 0);
     const [isChatOpen, setIsChatOpen] = useState(false);
 
     const handleProcess = (inq) => {

@@ -35,27 +35,48 @@ const QueryDetail = () => {
                 // Assuming 'visits' table has 'agent_id' and we join with 'users' or 'profiles'
                 // For now, we fetch extinguisher and visits. Agent name usually comes from user metadata or a profiles table.
                 // We'll try to fetch agent details if possible.
-                const { data, error } = await supabase
+                // Phase 1: Fetch the specific extinguisher to get its inquiry_no
+                const { data: initialData, error: initialError } = await supabase
                     .from('extinguishers')
-                    .select(`
-            *,
-            visits (
-              visit_date,
-              agent_id
-            )
-          `)
+                    .select('inquiry_no')
                     .eq('id', id)
                     .single();
 
-                if (error) throw error;
-                setQuery(data);
+                if (initialError) throw initialError;
 
-                // Fetch Customer Details using the same logic as CustomerDetails.jsx
-                if (data.customer_id) {
+                // Phase 2: Fetch all units and items sharing that inquiry_no
+                const { data, error } = await supabase
+                    .from('extinguishers')
+                    .select(`
+                        *,
+                        visits (
+                            visit_date,
+                            agent_id
+                        ),
+                        inquiry_items (*)
+                    `)
+                    .eq('inquiry_no', initialData.inquiry_no);
+
+                if (error) throw error;
+                
+                // Fetch all items from inquiry_items linked via extinguisher_id
+                // Sorting by serial_no ensures consistent display
+                const allItems = data[0]?.inquiry_items || [];
+                const sortedItems = [...allItems].sort((a,b) => (a.serial_no || 0) - (b.serial_no || 0));
+
+                const primaryQuery = {
+                    ...data[0],
+                    inquiry_items: sortedItems
+                };
+
+                setQuery(primaryQuery);
+
+                // Fetch Customer Details
+                if (data[0].customer_id) {
                     const { data: customerData, error: customerError } = await supabase
                         .from('customers')
                         .select('*')
-                        .eq('id', data.customer_id)
+                        .eq('id', data[0].customer_id)
                         .single();
 
                     if (!customerError) {
@@ -111,9 +132,11 @@ const QueryDetail = () => {
                     </button>
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900">
-                            {query.type || 'Query Details'}
+                            {query.inquiry_no || query.type || 'Query Details'}
                         </h1>
-                        <p className="text-sm text-slate-500">ID: #{query.id}</p>
+                        <p className="text-sm text-slate-500">
+                            ID: #{query.id} {query.serial_no ? `| Item #${query.serial_no}` : ''}
+                        </p>
                     </div>
                 </div>
                 <div className="flex gap-2">
@@ -131,21 +154,54 @@ const QueryDetail = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {/* Main Info */}
                 <div className="md:col-span-2 space-y-8">
-                    {/* Equipment Specifications */}
-                    <section className="bg-white rounded-2xl border p-6 space-y-6">
-                        <div className="flex items-center gap-2 border-b pb-4">
-                            <FireExtinguisher className="text-blue-600" size={20} />
-                            <h2 className="font-bold text-slate-900">Equipment Specifications</h2>
-                        </div>
-                        <div className="grid grid-cols-2 gap-6">
-                            <DetailItem icon={<Scale />} label="Capacity" value={query.capacity} />
-                            <DetailItem icon={<Box />} label="Quantity" value={query.quantity} />
-                            <DetailItem icon={<ShieldCheck />} label="Brand" value={query.brand} />
-                            <DetailItem icon={<Activity />} label="Condition" value={query.condition} />
-                            <DetailItem icon={<DollarSign />} label="Price" value={query.price ? `SAR ${query.price}` : null} />
-                            <DetailItem icon={<Calendar />} label="Created" value={formatDate(query.created_at)} />
-                        </div>
-                    </section>
+                    {/* Items List */}
+                    <div className="space-y-4">
+                        <h2 className="text-lg font-bold text-slate-900">Inquiry Items ({query.inquiry_items?.length || 0})</h2>
+                        {query.inquiry_items?.map((item) => (
+                            <section key={item.id} className="bg-white rounded-2xl border p-6 space-y-6">
+                                <div className="flex items-center justify-between border-b pb-4">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
+                                            {item.serial_no}
+                                        </div>
+                                        <div>
+                                            <h2 className="font-bold text-slate-900">{item.system_type || item.type || 'Standard Equipment'}</h2>
+                                            {item.system_type && <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tight">{item.type}</p>}
+                                        </div>
+                                    </div>
+                                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                        item.status === 'New' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                                    }`}>
+                                        {item.status}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                                    <DetailItem icon={<Scale />} label="Capacity" value={item.capacity} />
+                                    <DetailItem icon={<Box />} label="Quantity" value={`${item.quantity} ${item.unit || 'Pieces'}`} />
+                                    <DetailItem icon={<DollarSign />} label="Price" value={item.price ? `SAR ${item.price}` : 'N/A'} />
+                                    <DetailItem icon={<ShieldCheck />} label="Catalog No" value={item.catalog_no} />
+                                    <DetailItem icon={<Activity />} label="Condition" value={item.condition} />
+                                    <DetailItem icon={<FileText />} label="System" value={item.firefighting_system} />
+                                </div>
+                                {item.maintenance_notes && (
+                                    <div className="p-4 bg-slate-50 rounded-xl border-l-4 border-slate-300">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Notes</p>
+                                        <p className="text-sm text-slate-600 leading-relaxed">{item.maintenance_notes}</p>
+                                    </div>
+                                )}
+                                {(item.maintenance_unit_photo_url || item.maintenance_voice_url) && (
+                                    <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t">
+                                        {item.maintenance_unit_photo_url && (
+                                            <MediaItem title="Item Photo" url={item.maintenance_unit_photo_url} type="image" />
+                                        )}
+                                        {item.maintenance_voice_url && (
+                                            <MediaItem title="Voice Note" url={item.maintenance_voice_url} type="audio" />
+                                        )}
+                                    </div>
+                                )}
+                            </section>
+                        ))}
+                    </div>
 
                     {/* Maintenance Records */}
                     <section className="bg-white rounded-2xl border p-6 space-y-6">

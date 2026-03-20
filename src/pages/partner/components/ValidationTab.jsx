@@ -3,8 +3,8 @@ import { FileText, ChevronLeft, Calendar, MapPin, Tag, User, MessageCircle } fro
 import DocumentManagement from './DocumentManagement';
 import MockChatModal from './MockChatModal';
 
-const ValidationTab = ({ data }) => {
-    const [selectedInquiry, setSelectedInquiry] = useState(null);
+const ValidationTab = ({ data, initialInquiry }) => {
+    const [selectedInquiry, setSelectedInquiry] = useState(initialInquiry || null);
     const [isChatOpen, setIsChatOpen] = useState(false);
 
     if (selectedInquiry) {

@@ -38,7 +38,8 @@ const StatCard = ({ icon: Icon, title, value, color, subtitle }) => (
 );
 
 const PartnerDashboard = () => {
-    const [activeTab, setActiveTab] = useState('Validation');
+    const [filterType, setFilterType] = useState('All');
+    const [selectedInquiry, setSelectedInquiry] = useState(null);
     const [stats] = useState({
         activeInquiries: 12,
         pendingInquiries: 5,
@@ -47,48 +48,76 @@ const PartnerDashboard = () => {
         totalAgents: 8
     });
 
-    const renderTabContent = () => {
-        switch (activeTab) {
-            case 'Validation': return <ValidationTab data={validationInquiries} />;
-            case 'Maintenance': return <MaintenanceTab data={maintenanceInquiries} />;
-            case 'Refilled': return <RefilledTab data={refilledInquiries} />;
-            case 'New Unit': return <NewUnitTab data={newUnitInquiries} />;
-            default: return null;
-        }
+    // Consolidate all inquiries from data sources
+    const allInquiries = [
+        ...validationInquiries.map(inq => ({
+            ...inq,
+            inquiryType: 'Validation',
+            displayId: inq.id,
+            displayClient: inq.clientName,
+            originalData: inq
+        })),
+        ...maintenanceInquiries.map(inq => ({
+            ...inq,
+            inquiryType: 'Maintenance',
+            displayId: inq.inquiryNo || inq.id,
+            displayClient: inq.customerName,
+            originalData: inq
+        })),
+        ...refilledInquiries.map(inq => ({
+            ...inq,
+            inquiryType: 'Refilled',
+            displayId: inq.inquiryNo || inq.id,
+            displayClient: inq.customerName,
+            originalData: inq
+        })),
+        ...newUnitInquiries.map(inq => ({
+            ...inq,
+            inquiryType: 'New Unit',
+            displayId: inq.inquiryNo || inq.id,
+            displayClient: inq.customer,
+            originalData: inq
+        }))
+    ];
+
+    const filteredInquiries = filterType === 'All'
+        ? allInquiries
+        : allInquiries.filter(inq => inq.inquiryType === filterType);
+
+    const renderDetailView = () => {
+        if (!selectedInquiry) return null;
+
+        const { inquiryType, originalData } = selectedInquiry;
+
+        return (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <button
+                    onClick={() => setSelectedInquiry(null)}
+                    className="flex items-center gap-2 text-slate-500 hover:text-primary-500 transition-colors mb-6 font-bold text-sm"
+                >
+                    <ChevronRight size={18} className="rotate-180" /> Back to Global List
+                </button>
+
+                {inquiryType === 'Validation' && <ValidationTab data={[originalData]} initialInquiry={originalData} />}
+                {inquiryType === 'Maintenance' && <MaintenanceTab data={[originalData]} initialInquiry={originalData} />}
+                {inquiryType === 'Refilled' && <RefilledTab data={[originalData]} initialInquiry={originalData} />}
+                {inquiryType === 'New Unit' && <NewUnitTab data={[originalData]} initialInquiry={originalData} />}
+            </div>
+        );
     };
+
+    if (selectedInquiry) {
+        return (
+            <div className="min-h-screen pb-20 animate-in fade-in duration-700">
+                <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-soft-xl overflow-hidden p-8">
+                    {renderDetailView()}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen pb-20 animate-in fade-in duration-700">
-            {/* Top Bar */}
-            {/* <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 pt-4">
-                <div className="animate-in slide-in-from-left-4 duration-700">
-                    <h1 className="text-4xl md:text-5xl font-display font-black text-slate-900 tracking-tighter uppercase italic">
-                        Partner <span className="text-primary-500">Dashboard.</span>
-                    </h1>
-                    <div className="flex items-center gap-3 mt-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <p className="text-slate-500 font-bold text-sm tracking-wide">SYSTEM ONLINE - LATEST UPDATES AT 03:42 AM</p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-4 w-full md:w-auto animate-in slide-in-from-right-4 duration-700">
-                    <div className="relative flex-1 md:flex-none">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input
-                            placeholder="Search inquiries..."
-                            className="bg-white border border-slate-100 rounded-2xl py-3 pl-12 pr-6 outline-none focus:ring-2 focus:ring-primary-500 shadow-soft w-full font-medium text-sm transition-all"
-                        />
-                    </div>
-                    <button className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-600 hover:text-primary-500 shadow-soft relative transition-all active:scale-95 group">
-                        <Bell size={22} className="group-hover:rotate-12 transition-transform" />
-                        <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-primary-500 border-2 border-white rounded-full"></span>
-                    </button>
-                    <button className="p-3 bg-slate-900 text-white rounded-2xl shadow-xl hover:bg-primary-600 transition-all active:scale-95 group">
-                        <MessageSquare size={22} className="group-hover:-translate-y-1 transition-transform" />
-                    </button>
-                </div>
-            </div> */}
-
             {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-12 animate-in slide-in-from-bottom-6 duration-700 delay-100">
                 <StatCard icon={Layout} title="Total Active" value={stats.activeInquiries} color="bg-primary-500" subtitle="Inquiries" />
@@ -101,25 +130,84 @@ const PartnerDashboard = () => {
             {/* Main Application Area */}
             <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-soft-xl overflow-hidden animate-in slide-in-from-bottom-8 duration-1000 delay-200">
                 <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div className="flex flex-wrap gap-2 p-1.5 bg-slate-50 rounded-2xl border border-slate-100/50">
-                        {['Validation', 'Refilled', 'New Unit', 'Maintenance'].map((tab) => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-500 ${activeTab === tab
-                                    ? 'bg-white text-primary-500 shadow-soft-md'
-                                    : 'text-slate-400 hover:text-slate-600 hover:bg-white/50'
-                                    }`}
-                            >
-                                {tab}
-                            </button>
-                        ))}
+                    <div>
+                        <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight italic">
+                            All <span className="text-primary-500">Inquiries.</span>
+                        </h2>
+                        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">
+                            Showing {filteredInquiries.length} results
+                        </p>
                     </div>
 
+                    <div className="flex items-center gap-4">
+                        <div className="relative group">
+                            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-primary-500 transition-colors" size={16} />
+                            <select
+                                value={filterType}
+                                onChange={(e) => setFilterType(e.target.value)}
+                                className="pl-12 pr-10 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-600 outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all appearance-none cursor-pointer"
+                            >
+                                <option value="All">All Types</option>
+                                <option value="Validation">Validation</option>
+                                <option value="Refilled">Refilled</option>
+                                <option value="New Unit">New Unit</option>
+                                <option value="Maintenance">Maintenance</option>
+                            </select>
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                <Plus size={14} className="rotate-45" />
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="p-8 min-h-[500px]">
-                    {renderTabContent()}
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 bg-slate-50/50">
+                                    <th className="px-8 py-6">Inquiry No</th>
+                                    <th className="px-8 py-6">Client Name</th>
+                                    <th className="px-8 py-6">Inquiry Type</th>
+                                    <th className="px-8 py-6">Status</th>
+                                    <th className="px-8 py-6 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {filteredInquiries.map((inq, idx) => (
+                                    <tr key={`${inq.inquiryType}-${inq.id}-${idx}`} className="hover:bg-slate-50/50 transition-colors group">
+                                        <td className="px-8 py-6 font-black text-primary-600 text-sm tracking-tighter">
+                                            {inq.displayId}
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <p className="font-bold text-slate-900">{inq.displayClient}</p>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${inq.inquiryType === 'Validation' ? 'bg-blue-50 text-blue-600' :
+                                                    inq.inquiryType === 'Refilled' ? 'bg-purple-50 text-purple-600' :
+                                                        inq.inquiryType === 'New Unit' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
+                                                }`}>
+                                                {inq.inquiryType}
+                                            </span>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${inq.status === 'Active' || inq.status === 'Completed' || inq.status === 'Accepted' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                                                }`}>
+                                                {inq.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-8 py-6 text-right">
+                                            <button
+                                                onClick={() => setSelectedInquiry(inq)}
+                                                className="px-6 py-2 bg-slate-900 text-white hover:bg-primary-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-slate-200 hover:shadow-primary"
+                                            >
+                                                View Details
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

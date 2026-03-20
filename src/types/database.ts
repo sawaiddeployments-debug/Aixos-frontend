@@ -50,3 +50,28 @@ export interface Customer {
     location_lng: number | null;
     qr_code_url: string | null;
 }
+
+export interface InquiryItem {
+    id: number;
+    extinguisher_id: number;
+    serial_no: number;
+    type: string | null;
+    system_type: string | null;
+    capacity: string | null;
+    quantity: number;
+    unit: string | null;
+    price: number | string | null;
+    firefighting_system: string | null;
+    fire_alarm_system: string | null;
+    pump_type: string | null;
+    condition: string | null;
+    status: string | null;
+    catalog_no: string | null;
+    maintenance_notes: string | null;
+    maintenance_voice_url: string | null;
+    maintenance_unit_photo_url: string | null;
+    is_sub_unit: boolean;
+    query_status: 'Active' | 'Resolved' | null;
+    created_at: string;
+    updated_at: string;
+}
