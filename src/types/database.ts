@@ -16,9 +16,7 @@ export interface Extinguisher {
     seller: string | null;
     partner_id: string | null; // UUID of the partner
     price: number | string | null;
-    firefighting_system: string | null;
-    fire_alarm_system: string | null;
-    pump_type: string | null;
+    system: string | null;
     maintenance_notes: string | null;
     maintenance_voice_url: string | null;
     maintenance_unit_photo_url: string | null;
@@ -61,9 +59,7 @@ export interface InquiryItem {
     quantity: number;
     unit: string | null;
     price: number | string | null;
-    firefighting_system: string | null;
-    fire_alarm_system: string | null;
-    pump_type: string | null;
+    system: string | null;
     condition: string | null;
     status: string | null;
     catalog_no: string | null;

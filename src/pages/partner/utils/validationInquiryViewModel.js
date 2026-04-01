@@ -23,7 +23,7 @@ const normalizeUtilizationRows = (inquiry) => {
             type:
                 row.extinguisher_type ||
                 row.type ||
-                row.firefighting_system ||
+                row.system ||
                 '—',
             count: row.quantity ?? row.count ?? 0,
             serialRange:
@@ -38,7 +38,7 @@ const normalizeUtilizationRows = (inquiry) => {
     const items = inquiry.inquiry_items;
     if (Array.isArray(items) && items.length > 0) {
         return items.map((item) => ({
-            type: item.type || item.firefighting_system || item.system_type || '—',
+            type: item.type || item.system || item.system_type || '—',
             count: item.quantity ?? 0,
             serialRange:
                 item.serial_range ||

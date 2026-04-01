@@ -82,7 +82,7 @@ const Booking = () => {
                     quantity: 1,
                     price: item?.price || 0,
                     unit: item?.unit || 'Pieces',
-                    firefighting_system: item?.firefighting_system || null,
+                    system: item?.system || null,
                     condition: item?.condition || 'Good',
                     status: 'Refilled',
                     is_sub_unit: false
@@ -96,7 +96,7 @@ const Booking = () => {
                 quantity: 1,
                 unit: 'Pieces',
                 price: 0,
-                firefighting_system: null,
+                system: null,
                 condition: 'Good',
                 status: 'Pending',
                 is_sub_unit: false

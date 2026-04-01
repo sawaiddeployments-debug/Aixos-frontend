@@ -159,8 +159,6 @@ const VisitForm = () => {
       expiryDate: '',
       condition: 'Good',
       firefightingSystem: '',
-      fireAlarmSystem: '',
-      pumpType: '',
       maintenanceVoiceNote: null,
       maintenanceNotes: '',
       maintenanceUnitPhoto: null,
@@ -427,20 +425,14 @@ const VisitForm = () => {
 
         // Price calculation for BOTH New Unit AND Maintenance
         if (['New Unit', 'Maintenance'].includes(updated.mode) &&
-          ['firefightingSystem', 'fireAlarmSystem', 'pumpType', 'mode'].includes(field)) {
+          ['firefightingSystem', 'mode'].includes(field)) {
 
           const base = 180;
 
           // Find price from the data object
           const ffItem = FIRE_SYSTEMS.firefighting.find(it => it.name === updated.firefightingSystem);
-          const faItem = FIRE_SYSTEMS.fireAlarm.find(it => it.name === updated.fireAlarmSystem);
-          const pumpItem = FIRE_SYSTEMS.pumps.find(it => it.name === updated.pumpType);
-
           const ffPrice = ffItem ? ffItem.price : 0;
-          const faPrice = faItem ? faItem.price : 0;
-          const pumpPrice = pumpItem ? pumpItem.price : 0;
-
-          updated.price = base + ffPrice + faPrice + pumpPrice;
+          updated.price = base + ffPrice;
         }
 
         return updated;
@@ -456,8 +448,6 @@ const VisitForm = () => {
       brand: '', seller: '', partner: '', customPartner: '', refillStatus: 'Required',
       price: 180, expiryDate: '', condition: 'Good',
       firefightingSystem: '',
-      fireAlarmSystem: '',
-      pumpType: '',
       maintenanceVoiceNote: null,       // ← Add yeh
       maintenanceNotes: '',             // ← Add yeh
       maintenanceUnitPhoto: null,
@@ -908,9 +898,7 @@ const VisitForm = () => {
               quantity: item.quantity || 1,
               price: item.price || 180,
               unit: item.unit || 'Pieces',
-              firefighting_system: item.firefightingSystem || null,
-              fire_alarm_system: item.fireAlarmSystem || null,
-              pump_type: item.pumpType || null,
+              system: item.firefightingSystem || null,
               condition: item.condition || 'Good',
               status: item.mode === 'New Unit' ? 'New' : (item.mode === 'Refill' ? 'Refilled' : (item.mode === 'Validation' ? 'Valid' : 'Maintained')),
               catalog_no: item.catalog_no || null,
@@ -936,9 +924,7 @@ const VisitForm = () => {
                 quantity: sub.quantity || 1,
                 price: subPrice,
                 unit: sub.unit || 'Pieces',
-                firefighting_system: sub.firefightingSystem || null,
-                fire_alarm_system: item.fireAlarmSystem || null,
-                pump_type: item.pumpType || null,
+                system: sub.firefightingSystem || null,
                 condition: item.condition || 'Good',
                 status: 'New',
                 catalog_no: sub.catalog_no || null,
@@ -1639,19 +1625,6 @@ const VisitForm = () => {
                               </div>
                             </div>
 
-                            <div>
-                              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Fire Alarm MTP</label>
-                              <div className="text-sm font-medium text-slate-700 bg-white border rounded-xl p-3 border-[#e2e8f0] text-center">
-                                SAR {FIRE_SYSTEMS.fireAlarm.find(it => it.name === ext.fireAlarmSystem)?.price || 0}
-                              </div>
-                            </div>
-
-                            <div>
-                              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Pump MTP</label>
-                              <div className="text-sm font-medium text-slate-700 bg-white border rounded-xl p-3 border-[#e2e8f0] text-center">
-                                SAR {FIRE_SYSTEMS.pumps.find(it => it.name === ext.pumpType)?.price || 0}
-                              </div>
-                            </div>
 
                             <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center transition-all">
                               <label className="text-xs font-bold text-green-800 uppercase tracking-wider mb-1 block">Final Price (SAR)</label>
@@ -2098,19 +2071,6 @@ const VisitForm = () => {
                                 </div>
                               </div>
 
-                              <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Fire Alarm MTP</label>
-                                <div className="text-sm font-medium text-slate-700 bg-white border rounded-xl p-3 border-[#e2e8f0] text-center">
-                                  SAR {FIRE_SYSTEMS.fireAlarm.find(it => it.name === ext.fireAlarmSystem)?.price || 0}
-                                </div>
-                              </div>
-
-                              <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Pump MTP</label>
-                                <div className="text-sm font-medium text-slate-700 bg-white border rounded-xl p-3 border-[#e2e8f0] text-center">
-                                  SAR {FIRE_SYSTEMS.pumps.find(it => it.name === ext.pumpType)?.price || 0}
-                                </div>
-                              </div>
 
                               <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center transition-all">
                                 <label className="text-xs font-bold text-green-800 uppercase tracking-wider mb-1 block">Final Price (SAR)</label>

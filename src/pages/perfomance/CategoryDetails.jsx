@@ -21,8 +21,6 @@ const ALL_COLUMNS = [
   { id: "seller", label: "Seller" },
   { id: "partner", label: "Partner" },
   { id: "system", label: "System" },
-  { id: "fire_alarm", label: "Fire Alarm" },
-  { id: "pump", label: "Pump" },
   { id: "install_date", label: "Install Date" },
   { id: "last_refill", label: "Last Refill" },
   { id: "expiry_date", label: "Expiry Date" },
@@ -93,9 +91,7 @@ const CategoryDetails = () => {
                 seller,
                 partner,
                 query_status,
-                firefighting_system,
-                fire_alarm_system,
-                pump_type,
+                system,
                 maintenance_notes,
                 maintenance_voice_url,
                 maintenance_unit_photo_url,
@@ -170,14 +166,12 @@ const CategoryDetails = () => {
       switch (col.id) {
         case 'seq': return index + 1;
         case 'created_at': return formatDate(item.created_at);
-        case 'type': return item.type || item.firefighting_system || item.fire_alarm_system || item.pump_type || "NA";
+        case 'type': return item.type || item.system || "NA";
         case 'install_date': return formatDate(item.install_date);
         case 'last_refill': return formatDate(item.last_refill_date);
         case 'expiry_date': return formatDate(item.expiry_date);
         case 'price': return item.price !== null ? `SAR ${item.price}` : "NA";
-        case 'system': return item.firefighting_system || "NA";
-        case 'fire_alarm': return item.fire_alarm_system || "NA";
-        case 'pump': return item.pump_type || "NA";
+        case 'system': return item.system || "NA";
         case 'notes': return item.maintenance_notes || "--";
         default: return item[col.id] || "NA";
       }
@@ -280,8 +274,6 @@ const CategoryDetails = () => {
                 {visibleColumns.includes('seller') && <th className="px-4 py-4 text-left">Seller</th>}
                 {visibleColumns.includes('partner') && <th className="px-4 py-4 text-left">Partner</th>}
                 {visibleColumns.includes('system') && <th className="px-4 py-4 text-left">System</th>}
-                {visibleColumns.includes('fire_alarm') && <th className="px-4 py-4 text-left">Fire Alarm</th>}
-                {visibleColumns.includes('pump') && <th className="px-4 py-4 text-left">Pump</th>}
                 {visibleColumns.includes('install_date') && <th className="px-4 py-3 text-left">Install Date</th>}
                 {visibleColumns.includes('last_refill') && <th className="px-4 py-3 text-left">Last Refill</th>}
                 {visibleColumns.includes('expiry_date') && <th className="px-4 py-3 text-left">Expiry Date</th>}
@@ -306,11 +298,11 @@ const CategoryDetails = () => {
                   )}
                   {visibleColumns.includes('type') && (
                     <td className="px-4 py-3 whitespace-nowrap font-medium text-slate-900">
-                      {item.type || item.firefighting_system || item.fire_alarm_system || item.pump_type || "NA"}
+                      {item.type || item.system || "NA"}
                     </td>
                   )}
                   {visibleColumns.includes('capacity') && (
-                    <td className="px-4 py-3 text-slate-600">{item.capacity || (item.firefighting_system ? "System" : "NA")}</td>
+                    <td className="px-4 py-3 text-slate-600">{item.capacity || (item.system ? "System" : "NA")}</td>
                   )}
                   {visibleColumns.includes('quantity') && (
                     <td className="px-4 py-3 text-slate-600">{item.quantity ?? "NA"}</td>
@@ -347,13 +339,7 @@ const CategoryDetails = () => {
                     <td className="px-4 py-3 text-slate-600">{item.partner || "NA"}</td>
                   )}
                   {visibleColumns.includes('system') && (
-                    <td className="px-4 py-3 whitespace-nowrap text-slate-600">{item.firefighting_system || "NA"}</td>
-                  )}
-                  {visibleColumns.includes('fire_alarm') && (
-                    <td className="px-4 py-3 whitespace-nowrap text-slate-600">{item.fire_alarm_system || "NA"}</td>
-                  )}
-                  {visibleColumns.includes('pump') && (
-                    <td className="px-4 py-3 whitespace-nowrap text-slate-600">{item.pump_type || "NA"}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-slate-600">{item.system || "NA"}</td>
                   )}
                   {visibleColumns.includes('install_date') && (
                     <td className="px-4 py-3 whitespace-nowrap text-slate-500 font-mono text-xs">{formatDate(item.install_date)}</td>

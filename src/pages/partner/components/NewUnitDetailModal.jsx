@@ -23,7 +23,7 @@ const NewUnitDetailModal = ({ isOpen, onClose, inquiry, onUpdate }) => {
     useEffect(() => {
         if (inquiry && isOpen) {
             const preselected = inquiry.selectedItem || {};
-            const baseProductName = preselected.type || preselected.firefighting_system || '';
+            const baseProductName = preselected.type || preselected.system || '';
             const options = Array.isArray(preselected.catalog_options) ? preselected.catalog_options : [];
             const normalizedCatalogs = options
                 .filter((option) => option?.catalog_no)
@@ -61,7 +61,7 @@ const NewUnitDetailModal = ({ isOpen, onClose, inquiry, onUpdate }) => {
         const currentItem = inquiry?.selectedItem || {};
         const selectedCatalog = availableCatalogs.find((item) => item.catalog_no === selectedCatalogNo);
         setProductInfo({
-            productName: selectedProductName || currentItem.type || currentItem.firefighting_system || 'Fire Equipment',
+            productName: selectedProductName || currentItem.type || currentItem.system || 'Fire Equipment',
             catalog_no: selectedCatalogNo,
             capacity: selectedCatalog?.capacity || currentItem.capacity || '--',
             type: selectedCatalog?.type || currentItem.type || '--',

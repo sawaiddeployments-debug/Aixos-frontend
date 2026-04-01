@@ -178,12 +178,13 @@ const InquiryItemsList = () => {
                                             </td>
                                         </tr>
                                     )}
-                                    {(inquiry.inquiry_items || []).map((item) => (
-                                        <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
+                                    {(inquiry.inquiry_items || []).map((item) => {
+                                        console.log(item)
+                                        return(
+                                            <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group">
                                             <td className="px-8 py-6">
                                                 <div className="flex flex-col">
-                                                    <span className="font-black text-slate-900 tracking-tight leading-none">{item.type || item.firefighting_system || 'Fire Equipment'}</span>
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1.5 italic">Safety Equipment</span>
+                                                    <span className="font-black text-slate-900 tracking-tight leading-none">{item.system || 'Fire Equipment'}</span>
                                                 </div>
                                             </td>
                                             <td className="px-8 py-6">
@@ -205,7 +206,8 @@ const InquiryItemsList = () => {
                                                 </Link>
                                             </td>
                                         </tr>
-                                    ))}
+                                        )
+                                    })}
                                 </tbody>
                             </table>
                         </div>

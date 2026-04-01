@@ -174,7 +174,7 @@ const QueryDetail = () => {
                                     <DetailItem icon={<DollarSign />} label="Price" value={item.price ? `SAR ${item.price}` : 'N/A'} />
                                     <DetailItem icon={<ShieldCheck />} label="Catalog No" value={item.catalog_no} />
                                     <DetailItem icon={<Activity />} label="Condition" value={item.condition} />
-                                    <DetailItem icon={<FileText />} label="System" value={item.firefighting_system} />
+                                    <DetailItem icon={<FileText />} label="System" value={item.system} />
                                 </div>
                                 {item.maintenance_notes && (
                                     <div className="p-4 bg-slate-50 rounded-xl border-l-4 border-slate-300">
@@ -203,9 +203,7 @@ const QueryDetail = () => {
                             <h2 className="font-bold text-slate-900">Maintenance Details</h2>
                         </div>
                         <div className="grid grid-cols-2 gap-6">
-                            <DetailItem label="Fire Fighting System" value={primaryItem?.firefighting_system} />
-                            <DetailItem label="Fire Alarm System" value={primaryItem?.fire_alarm_system} />
-                            <DetailItem label="Pump Type" value={primaryItem?.pump_type} />
+                            <DetailItem label="System" value={primaryItem?.system} />
                             <DetailItem label="Install Date" value={formatDate(primaryItem?.install_date)} />
                             <DetailItem label="Last Refill" value={formatDate(primaryItem?.last_refill_date)} />
                             <DetailItem label="Expiry Date" value={formatDate(primaryItem?.expiry_date)} />

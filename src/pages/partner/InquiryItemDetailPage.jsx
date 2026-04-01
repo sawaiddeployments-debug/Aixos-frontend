@@ -260,7 +260,7 @@ const InquiryItemDetailPage = () => {
     const issueParts = [
         item.maintenance_notes,
         item.system_type && `Component: ${item.system_type}`,
-        item.firefighting_system && `System: ${item.firefighting_system}`
+        item.system && `System: ${item.system}`
     ].filter(Boolean);
     const issueText =
         inquiry.description ||
@@ -474,7 +474,7 @@ const InquiryItemDetailPage = () => {
                         <DetailField label="Catalog no." value={formatVal(item.catalog_no)} />
                         <DetailField label="Sub-unit" value={formatVal(item.is_sub_unit)} />
                         <DetailField label="Query status" value={formatVal(item.query_status)} />
-                        <DetailField label="System" value={formatVal(item.firefighting_system)} />
+                        <DetailField label="System" value={formatVal(item.system)} />
                         <DetailField label="System type" value={formatVal(item.system_type)} />
                         </div>
                 </div>
