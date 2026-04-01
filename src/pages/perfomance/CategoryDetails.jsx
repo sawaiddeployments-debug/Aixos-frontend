@@ -29,7 +29,7 @@ const ALL_COLUMNS = [
   { id: "actions", label: "Actions" },
 ];
 
-const DEFAULT_VISIBLE_COLUMNS = ["seq", "created_at", "type", "capacity", "price", "status", "condition", "actions"];
+const DEFAULT_VISIBLE_COLUMNS = ["seq", "created_at", "type", "price", "status", "actions"];
 
 const toCanonicalInquiryType = (raw) => {
   const v = decodeURIComponent((raw || "").toString()).trim().toLowerCase();
@@ -105,12 +105,34 @@ const CategoryDetails = () => {
 
       if (!error) {
         const inquiryMap = new Map((inquiries || []).map((q) => [q.id, q]));
-        const enriched = (items || []).map((it) => ({
-          ...it,
-          inquiry_no: inquiryMap.get(it.inquiry_id)?.inquiry_no,
-          inquiry_status: inquiryMap.get(it.inquiry_id)?.status || "pending"
-        }));
-        setData(enriched);
+        
+        // Group items by inquiry_id to consolidate them
+        const consolidatedInquiries = {};
+        
+        (items || []).forEach((it) => {
+          if (!consolidatedInquiries[it.inquiry_id]) {
+            const inquiryObj = inquiryMap.get(it.inquiry_id);
+            consolidatedInquiries[it.inquiry_id] = {
+              id: it.inquiry_id, // unique ID for navigation
+              inquiry_id: it.inquiry_id,
+              inquiry_no: inquiryObj?.inquiry_no,
+              created_at: inquiryObj?.created_at || it.created_at,
+              type: inquiryObj?.type || it.type,
+              status: inquiryObj?.status || "pending",
+              inquiry_status: inquiryObj?.status || "pending",
+              quantity: 0,
+              price: 0,
+              items_count: 0
+            };
+          }
+          
+          const entry = consolidatedInquiries[it.inquiry_id];
+          entry.quantity += Number(it.quantity || 0);
+          entry.price += Number(it.price || 0) * Number(it.quantity || 1);
+          entry.items_count += 1;
+        });
+
+        setData(Object.values(consolidatedInquiries));
       }
       setLoading(false);
     };
