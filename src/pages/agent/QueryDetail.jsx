@@ -53,7 +53,7 @@ const QueryDetail = () => {
                 if (itemsError) throw itemsError;
 
                 const allItems = itemsData || [];
-                const sortedItems = [...allItems].sort((a,b) => (a.serial_no || 0) - (b.serial_no || 0));
+                const sortedItems = [...allItems].sort((a, b) => (a.serial_no || 0) - (b.serial_no || 0));
 
                 const primaryQuery = {
                     ...inquiryData,
@@ -112,6 +112,8 @@ const QueryDetail = () => {
         </div>
     );
 
+    console.log(query, "query");
+
     return (
         <div className="mx-auto p-6 space-y-8">
             {/* Header */}
@@ -144,6 +146,18 @@ const QueryDetail = () => {
                 </div>
             </div>
 
+            {query.follow_up_date && (
+                <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-center gap-3 animate-fade-in shadow-sm">
+                    <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+                        <Calendar size={20} />
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-blue-500 uppercase font-black tracking-widest leading-tight">Follow-up Scheduled</p>
+                        <p className="text-sm font-bold text-blue-900">{formatDate(query.follow_up_date)}</p>
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {/* Main Info */}
                 <div className="md:col-span-2 space-y-8">
@@ -162,9 +176,8 @@ const QueryDetail = () => {
                                             {item.system_type && <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tight">{item.type}</p>}
                                         </div>
                                     </div>
-                                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${
-                                        item.status === 'New' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                                    }`}>
+                                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${item.status === 'New' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                                        }`}>
                                         {item.status}
                                     </span>
                                 </div>
@@ -197,24 +210,26 @@ const QueryDetail = () => {
                     </div>
 
                     {/* Maintenance Records */}
-                    <section className="bg-white rounded-2xl border p-6 space-y-6">
-                        <div className="flex items-center gap-2 border-b pb-4">
-                            <FileText className="text-purple-600" size={20} />
-                            <h2 className="font-bold text-slate-900">Maintenance Details</h2>
-                        </div>
-                        <div className="grid grid-cols-2 gap-6">
-                            <DetailItem label="System" value={primaryItem?.system} />
-                            <DetailItem label="Install Date" value={formatDate(primaryItem?.install_date)} />
-                            <DetailItem label="Last Refill" value={formatDate(primaryItem?.last_refill_date)} />
-                            <DetailItem label="Expiry Date" value={formatDate(primaryItem?.expiry_date)} />
-                        </div>
-                        {primaryItem?.maintenance_notes && (
-                            <div className="p-4 bg-slate-50 rounded-xl border-l-4 border-slate-300">
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Notes</p>
-                                <p className="text-sm text-slate-600 leading-relaxed">{primaryItem.maintenance_notes}</p>
+                    {query.status === "Valid" && query.status !== "Refilled" && (
+                        <section className="bg-white rounded-2xl border p-6 space-y-6">
+                            <div className="flex items-center gap-2 border-b pb-4">
+                                <FileText className="text-purple-600" size={20} />
+                                <h2 className="font-bold text-slate-900">Maintenance Details</h2>
                             </div>
-                        )}
-                    </section>
+                            <div className="grid grid-cols-2 gap-6">
+                                <DetailItem label="System" value={primaryItem?.system} />
+                                <DetailItem label="Install Date" value={formatDate(primaryItem?.install_date)} />
+                                <DetailItem label="Last Refill" value={formatDate(primaryItem?.last_refill_date)} />
+                                <DetailItem label="Expiry Date" value={formatDate(primaryItem?.expiry_date)} />
+                            </div>
+                            {primaryItem?.maintenance_notes && (
+                                <div className="p-4 bg-slate-50 rounded-xl border-l-4 border-slate-300">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Notes</p>
+                                    <p className="text-sm text-slate-600 leading-relaxed">{primaryItem.maintenance_notes}</p>
+                                </div>
+                            )}
+                        </section>
+                    )}
 
                     {/* Media Section */}
                     {(primaryItem?.extinguisher_photo || primaryItem?.maintenance_unit_photo_url || primaryItem?.maintenance_voice_url) && (

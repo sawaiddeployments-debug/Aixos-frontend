@@ -909,6 +909,8 @@ const VisitForm = () => {
               maintenance_voice_url: voiceUrl,
               maintenance_unit_photo_url: photoUrl,
               expiry_date: item.expiryDate || null,
+              follow_up_date: formData.followUpDate || null,
+              performed_by: formData.performedBy || 'Agent',
               is_sub_unit: false,
             });
           }
@@ -935,6 +937,8 @@ const VisitForm = () => {
                 maintenance_voice_url: voiceUrl,
                 maintenance_unit_photo_url: photoUrl,
                 expiry_date: item.expiryDate || null,
+                follow_up_date: formData.followUpDate || null,
+                performed_by: formData.performedBy || 'Agent',
                 is_sub_unit: true,
               });
             });
@@ -950,7 +954,8 @@ const VisitForm = () => {
           visit_id: visitId,
           type: inquiryType,
           priority: 'Medium',
-          performed_by: formData.performedBy || 'Agent'
+          performed_by: formData.performedBy || 'Agent',
+          follow_up_date: formData.followUpDate || null
         };
 
         if (allItemsPayload.length > 0) {
