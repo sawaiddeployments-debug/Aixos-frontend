@@ -14,10 +14,12 @@ import {
     Link2,
     Image as ImageIcon,
     Mic,
+    Edit2,
     CheckCircle,
     XCircle
 } from 'lucide-react';
 import { getInquiryById, updateInquiryStatus } from '../../api/partners';
+import NewUnitDetailModal from './components/NewUnitDetailModal';
 import {
     acceptInquiry,
     fetchSiteAssessmentByInquiryId,
@@ -127,6 +129,7 @@ const InquiryItemDetailPage = () => {
     const [docsLoading, setDocsLoading] = useState(false);
     const [docsError, setDocsError] = useState('');
     const [inspectionModalOpen, setInspectionModalOpen] = useState(false);
+    const [isNewUnitModalOpen, setIsNewUnitModalOpen] = useState(false);
 
     const loadInquiry = async ({ showPageLoader = true } = {}) => {
         if (showPageLoader) setLoading(true);
@@ -464,10 +467,20 @@ const InquiryItemDetailPage = () => {
 
                     {/* Identification & systems */}
                     <div className="border-t border-slate-100 pt-10">
-                        <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <Hash size={16} />
-                            Identification &amp; systems
-                        </h2>
+                        <div className="flex items-center justify-between gap-2 mb-4">
+                            <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <Hash size={16} />
+                                Identification &amp; systems
+                            </h2>
+                            <button
+                                type="button"
+                                onClick={() => setIsNewUnitModalOpen(true)}
+                                className="p-2 bg-slate-900 hover:bg-primary-500 text-white rounded-xl shadow-lg transition-all active:scale-95 group"
+                                title="Edit identification details"
+                            >
+                                <Edit2 size={14} className="group-hover:rotate-12 transition-transform" />
+                            </button>
+                        </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                             <DetailField label="Serial no." value={formatVal(item.serial_no)} />
                             <DetailField label="Catalog no." value={formatVal(item.catalog_no)} />
@@ -710,6 +723,15 @@ const InquiryItemDetailPage = () => {
                     } catch (e) {
                         console.error(e);
                     }
+                }}
+            />
+
+            <NewUnitDetailModal
+                isOpen={isNewUnitModalOpen}
+                onClose={() => setIsNewUnitModalOpen(false)}
+                inquiry={{ ...inquiry, selectedItem: item }}
+                onUpdate={async () => {
+                    await loadInquiry({ showPageLoader: false });
                 }}
             />
         </div>

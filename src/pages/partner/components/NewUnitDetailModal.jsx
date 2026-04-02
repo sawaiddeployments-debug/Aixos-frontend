@@ -95,7 +95,12 @@ const NewUnitDetailModal = ({ isOpen, onClose, inquiry, onUpdate }) => {
                 catalog_no: selectedCatalogNo,
                 quantity: confirmedQuantity,
                 price: pricePerUnit,
-                maintenance_notes: remarks
+                maintenance_notes: remarks,
+                brand: productInfo.manufacturer !== '--' ? productInfo.manufacturer : undefined,
+                system: productInfo.productName !== '--' ? productInfo.productName : undefined,
+                system_type: productInfo.specs.description !== '--' ? productInfo.specs.description : undefined,
+                type: productInfo.type !== '--' ? productInfo.type : undefined,
+                capacity: productInfo.capacity !== '--' ? productInfo.capacity : undefined,
             });
             setIsSuccess(true);
             toast.success('Item updated successfully');
