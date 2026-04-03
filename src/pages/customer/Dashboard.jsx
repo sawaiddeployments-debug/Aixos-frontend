@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import PageLoader from '../../components/PageLoader';
 import { fetchCustomerInquiries, fetchCustomerQuotations, approveQuotation } from '../../api/customerPortal';
+import { approveMaintenanceSchedule } from '../../api/maintenanceApi';
 import {
     buildHistoryRowsFromInquiry,
     buildHistoryRowsFromService,
@@ -25,6 +26,7 @@ import {
     buildInquiryTimeline
 } from './dashboardUtils';
 import { toast } from 'react-hot-toast';
+import InquiryChatBox from '../../components/Chat/InquiryChatBox';
 
 const EXPIRY_ALERT_DAYS = 10;
 
@@ -229,6 +231,16 @@ const CustomerDashboard = () => {
         }
     };
 
+    const handleScheduleAction = async (inquiryId, status) => {
+        try {
+            await approveMaintenanceSchedule(inquiryId, status);
+            toast.success(`Schedule ${status} successfully`);
+            window.location.reload();
+        } catch (e) {
+            toast.error(e?.response?.data?.error || `Could not update schedule`);
+        }
+    };
+
     return (
         <div className="relative min-h-[400px] space-y-8">
             {loading && <PageLoader message="Loading your dashboard..." />}
@@ -337,6 +349,49 @@ const CustomerDashboard = () => {
                                                 <p className="text-xs text-slate-500 mt-1">
                                                     Created: {formatDateSafe(inq.created_at)} · Internal ref: {internalRef}
                                                 </p>
+                                                {(inq.scheduled_date || inq.approval_status) && (
+                                                    <div className="mt-2 text-xs flex flex-col items-start gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Calendar size={14} className="text-primary-500" />
+                                                            <span className="font-bold text-primary-700">
+                                                                Visit: {inq.scheduled_date ? new Date(inq.scheduled_date).toLocaleString('en-PK', {
+                                                                    timeZone: 'Asia/Karachi',
+                                                                    year: 'numeric',
+                                                                    month: 'short',
+                                                                    day: 'numeric',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                    hour12: true
+                                                                }) : 'Not set'}
+                                                            </span>
+                                                            {inq.approval_status && (
+                                                                <span className={`px-2 py-0.5 rounded-md font-bold uppercase tracking-wider text-[10px] ${
+                                                                    inq.approval_status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                                                                    inq.approval_status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                                                    'bg-amber-100 text-amber-700'
+                                                                }`}>
+                                                                    {inq.approval_status}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {inq.approval_status === 'pending' && inq.scheduled_date && (
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleScheduleAction(inq.id, 'approved'); }}
+                                                                    className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-bold text-[10px] uppercase tracking-wider hover:bg-emerald-700 transition"
+                                                                >
+                                                                    Approve
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleScheduleAction(inq.id, 'rejected'); }}
+                                                                    className="px-3 py-1.5 bg-red-500 text-white rounded-lg font-bold text-[10px] uppercase tracking-wider hover:bg-red-600 transition"
+                                                                >
+                                                                    Reject
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-3">
                                                 <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-black uppercase text-slate-700">
@@ -440,6 +495,19 @@ const CustomerDashboard = () => {
                                                             No child updates found for this inquiry yet.
                                                         </p>
                                                     )}
+
+                                                    {/* NEW: Chat / Discussion Box for Customer */}
+                                                    <div className="pt-6 border-t border-slate-100">
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
+                                                            Messages / Support
+                                                        </p>
+                                                        <InquiryChatBox 
+                                                            inquiryId={inq.id} 
+                                                            recipientId={inq.partner_id} 
+                                                            recipientRole="Partner"
+                                                            title={`Chat with Partner regarding ${inq.inquiry_no || 'Inquiry'}`}
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}

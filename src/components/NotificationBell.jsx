@@ -83,6 +83,30 @@ const NotificationBell = ({ onOpenChat }) => {
             console.warn('NotificationBell inquiries:', e);
         }
 
+        try {
+            const { data: dbNotifs, error } = await supabase
+                .from('notifications')
+                .select('*')
+                .eq('recipient_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(15);
+            
+            if (!error && dbNotifs) {
+                dbNotifs.forEach((n) => {
+                    list.push({
+                         id: `notif-${n.id}`, 
+                         title: n.sender_role === 'partner' ? 'Partner Update' : 'New System Alert',
+                         message: n.message,
+                         type: 'message',
+                         timestamp: n.created_at,
+                         isRead: n.is_read
+                    });
+                });
+            }
+        } catch (e) {
+            console.warn('NotificationBell db fetches:', e);
+        }
+
         list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         setNotifications(list.slice(0, 15));
         setUnreadCount(list.filter((n) => !n.isRead).length);

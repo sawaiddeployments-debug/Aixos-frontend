@@ -17,6 +17,23 @@ export const acceptInquiry = async (inquiryId) => {
     return extractApiData(response, null);
 };
 
+export const scheduleMaintenanceVisit = async (inquiryId, scheduledDate) => {
+    const response = await client.post('/schedule', {
+        inquiry_id: inquiryId,
+        scheduled_date: scheduledDate
+    });
+    return extractApiData(response, null);
+};
+
+export const approveMaintenanceSchedule = async (inquiryId, status) => {
+    const response = await client.patch('/approve', {
+        inquiry_id: inquiryId,
+        status
+    });
+    return extractApiData(response, null);
+};
+
+
 export const fetchSiteAssessmentByInquiryId = async (inquiryId) => {
     const response = await client.get(`/site-assessments/${inquiryId}`);
     return extractApiData(response, null);

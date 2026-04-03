@@ -27,8 +27,11 @@ import {
 } from '../../api/maintenanceApi';
 import ChatModal from '../../components/Chat/ChatModal';
 import PartnerPostAcceptCard from './components/PartnerPostAcceptCard';
+import ScheduleDateModal from './components/ScheduleDateModal';
+import InquiryChatBox from '../../components/Chat/InquiryChatBox';
 import PartnerInspectionReportModal from './components/PartnerInspectionReportModal';
 import { toast } from 'react-hot-toast';
+import { scheduleMaintenanceVisit } from '../../api/maintenanceApi';
 
 const statusBadgeClass = (status) => {
     const s = (status || '').toLowerCase();
@@ -147,6 +150,7 @@ const InquiryItemDetailPage = () => {
     const [docsError, setDocsError] = useState('');
     const [inspectionModalOpen, setInspectionModalOpen] = useState(false);
     const [isNewUnitModalOpen, setIsNewUnitModalOpen] = useState(false);
+    const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
     const loadInquiry = async ({ showPageLoader = true } = {}) => {
         if (showPageLoader) setLoading(true);
@@ -236,6 +240,17 @@ const InquiryItemDetailPage = () => {
             toast.error(`Failed to ${newStatus} inquiry`);
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    const handleScheduleDateSubmit = async (date) => {
+        try {
+            await scheduleMaintenanceVisit(inquiryId, date);
+            toast.success('Site visit scheduled successfully. Awaiting customer approval.');
+            await loadInquiry({ showPageLoader: false });
+        } catch (error) {
+            toast.error('Failed to schedule visit');
+            throw error;
         }
     };
 
@@ -677,11 +692,32 @@ const InquiryItemDetailPage = () => {
                     />
                 )}
                 {isMaintenanceInquiry && isInquiryAccepted && (
-                    <PartnerPostAcceptCard
-                        inquiryId={inquiryId}
-                        itemId={itemId}
-                        onUploadReport={() => setInspectionModalOpen(true)}
-                    />
+                    <div className="flex flex-col gap-6 w-full lg:w-96">
+                        <PartnerPostAcceptCard
+                            inquiryId={inquiryId}
+                            itemId={itemId}
+                            onUploadReport={() => setInspectionModalOpen(true)}
+                            onScheduleDate={() => setIsScheduleModalOpen(true)}
+                            approvalStatus={inquiry.approval_status}
+                            scheduledDate={inquiry.scheduled_date}
+                        />
+                        <InquiryChatBox 
+                            inquiryId={inquiryId} 
+                            recipientId={inquiry.customer_id} 
+                            recipientRole="Customer"
+                            title="Chat with Customer"
+                        />
+                    </div>
+                )}
+                {!isMaintenanceInquiry && isInquiryAccepted && (
+                    <div className="flex flex-col gap-6 w-full lg:w-96">
+                        <InquiryChatBox 
+                            inquiryId={inquiryId} 
+                            recipientId={inquiry.customer_id} 
+                            recipientRole="Customer"
+                            title="Chat with Customer"
+                        />
+                    </div>
                 )}
             </div>
 
@@ -716,6 +752,12 @@ const InquiryItemDetailPage = () => {
                 onUpdate={async () => {
                     await loadInquiry({ showPageLoader: false });
                 }}
+            />
+
+            <ScheduleDateModal
+                isOpen={isScheduleModalOpen}
+                onClose={() => setIsScheduleModalOpen(false)}
+                onSchedule={handleScheduleDateSubmit}
             />
         </div>
     );
