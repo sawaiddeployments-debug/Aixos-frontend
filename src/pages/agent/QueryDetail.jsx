@@ -25,13 +25,14 @@ const QueryDetail = () => {
     const navigate = useNavigate();
     const [query, setQuery] = useState(null);
     const [customer, setCustomer] = useState(null);
+    const [quotation, setQuotation] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchQueryDetail = async () => {
             setLoading(true);
             try {
-                const { data: inquiryData, error: inquiryError } = await supabase
+                const { data: inquiryData, inquiryError } = await supabase
                     .from('inquiries')
                     .select(`
                         *,
@@ -51,6 +52,15 @@ const QueryDetail = () => {
                     .eq('inquiry_id', id);
 
                 if (itemsError) throw itemsError;
+
+                // Fetch Quotation (Cost Only for Agent)
+                const { data: quotationData } = await supabase
+                    .from('quotations')
+                    .select('estimated_cost, created_at')
+                    .eq('inquiry_id', id)
+                    .single();
+
+                setQuotation(quotationData);
 
                 const allItems = itemsData || [];
                 const sortedItems = [...allItems].sort((a, b) => (a.serial_no || 0) - (b.serial_no || 0));
@@ -300,8 +310,38 @@ const QueryDetail = () => {
                             </div>
                         </div>
                         {/* Visual Decoration */}
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16"></ div>
                     </section>
+
+                    {/* Quotation Section (Agent: Cost Only) */}
+                    {quotation && (
+                        <section className="bg-white rounded-2xl border p-6 space-y-6 relative overflow-hidden group hover:border-emerald-200 transition-all">
+                            <div className="flex items-center gap-2 border-b border-slate-50 pb-4">
+                                <DollarSign className="text-emerald-500" size={20} />
+                                <h2 className="font-bold text-slate-900 border-none inline-block">Partner Quotation</h2>
+                            </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Estimated Cost</p>
+                                    <p className="text-2xl font-black text-slate-900 tracking-tight">
+                                        {quotation.estimated_cost ? `$${quotation.estimated_cost}` : '—'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Submitted on</p>
+                                    <p className="text-sm font-medium text-slate-600">
+                                        {formatDate(quotation.created_at)}
+                                    </p>
+                                </div>
+                                <div className="p-3 bg-amber-50 rounded-xl border border-amber-100 flex items-start gap-2">
+                                    <Info className="text-amber-500 shrink-0 mt-0.5" size={14} />
+                                    <p className="text-[10px] text-amber-800 leading-relaxed font-bold">
+                                        Agent Access Restricted: Only the estimated cost is visible. PDF quotation is reserved for Customer review.
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+                    )}
 
                     {/* Quick Support */}
                     <section className="bg-white rounded-2xl border p-6 text-center space-y-4">

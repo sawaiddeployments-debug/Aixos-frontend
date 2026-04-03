@@ -30,8 +30,12 @@ import PartnerPostAcceptCard from './components/PartnerPostAcceptCard';
 import ScheduleDateModal from './components/ScheduleDateModal';
 import InquiryChatBox from '../../components/Chat/InquiryChatBox';
 import PartnerInspectionReportModal from './components/PartnerInspectionReportModal';
+import PartnerQuotationModal from './components/PartnerQuotationModal';
 import { toast } from 'react-hot-toast';
-import { scheduleMaintenanceVisit } from '../../api/maintenanceApi';
+import { 
+    scheduleMaintenanceVisit, 
+    fetchQuotationByInquiryId 
+} from '../../api/maintenanceApi';
 
 const statusBadgeClass = (status) => {
     const s = (status || '').toLowerCase();
@@ -146,9 +150,11 @@ const InquiryItemDetailPage = () => {
     const [actionLoading, setActionLoading] = useState(false);
     const [siteAssessment, setSiteAssessment] = useState(null);
     const [inspectionReports, setInspectionReports] = useState([]);
+    const [quotation, setQuotation] = useState(null);
     const [docsLoading, setDocsLoading] = useState(false);
     const [docsError, setDocsError] = useState('');
     const [inspectionModalOpen, setInspectionModalOpen] = useState(false);
+    const [isQuotationModalOpen, setIsQuotationModalOpen] = useState(false);
     const [isNewUnitModalOpen, setIsNewUnitModalOpen] = useState(false);
     const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
@@ -175,6 +181,7 @@ const InquiryItemDetailPage = () => {
         if (!inquiryId || !inquiry) {
             setSiteAssessment(null);
             setInspectionReports([]);
+            setQuotation(null);
             return;
         }
         const isMaint = (inquiry.type || inquiry.inquiry_type || '').toString().trim().toLowerCase() === 'maintenance';
@@ -182,6 +189,7 @@ const InquiryItemDetailPage = () => {
         if (!isMaint || !acc) {
             setSiteAssessment(null);
             setInspectionReports([]);
+            setQuotation(null);
             return;
         }
         let cancelled = false;
@@ -189,21 +197,24 @@ const InquiryItemDetailPage = () => {
             setDocsLoading(true);
             setDocsError('');
             try {
-                const [a, r] = await Promise.all([
+                const [a, r, q] = await Promise.all([
                     fetchSiteAssessmentByInquiryId(inquiryId),
-                    fetchInspectionReportsByInquiryId(inquiryId)
+                    fetchInspectionReportsByInquiryId(inquiryId),
+                    fetchQuotationByInquiryId(inquiryId)
                 ]);
                 if (cancelled) return;
                 setSiteAssessment(a);
                 setInspectionReports(Array.isArray(r) ? r : []);
+                setQuotation(q);
             } catch (e) {
                 console.error(e);
                 if (!cancelled) {
                     setDocsError(
-                        'Could not load site assessment or inspection reports. Check that the API is running and you have access to this inquiry.'
+                        'Could not load technical documentation. Check that the API is running.'
                     );
                     setSiteAssessment(null);
                     setInspectionReports([]);
+                    setQuotation(null);
                 }
             } finally {
                 if (!cancelled) setDocsLoading(false);
@@ -575,6 +586,7 @@ const InquiryItemDetailPage = () => {
                                 </div>
                             ) : (
                                 <div className="space-y-10">
+                                    {/* Site Assessment */}
                                     <div>
                                         <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">
                                             Site assessment
@@ -622,6 +634,8 @@ const InquiryItemDetailPage = () => {
                                             </p>
                                         )}
                                     </div>
+
+                                    {/* Inspection Reports */}
                                     <div>
                                         <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">
                                             Inspection reports
@@ -677,6 +691,47 @@ const InquiryItemDetailPage = () => {
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Quotation Section */}
+                                    <div className="pt-6 border-t border-slate-100">
+                                        <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">
+                                            Pro-forma Quotation
+                                        </h3>
+                                        {quotation ? (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <DetailField
+                                                    label="Estimated cost ($)"
+                                                    value={quotation.estimated_cost ? `$${quotation.estimated_cost}` : '—'}
+                                                />
+                                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                                                            Quotation File
+                                                        </p>
+                                                        <p className="text-slate-900 font-semibold text-sm">PDF Document</p>
+                                                    </div>
+                                                    {quotation.pdf_url && (
+                                                        <a
+                                                            href={quotation.pdf_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg transition-all"
+                                                        >
+                                                            View PDF
+                                                        </a>
+                                                    )}
+                                                </div>
+                                                <DetailField
+                                                    label="Submitted on"
+                                                    value={formatDateTime(quotation.created_at)}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-slate-500 italic p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                                No quotation has been submitted for this inquiry yet.
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -698,6 +753,7 @@ const InquiryItemDetailPage = () => {
                             itemId={itemId}
                             onUploadReport={() => setInspectionModalOpen(true)}
                             onScheduleDate={() => setIsScheduleModalOpen(true)}
+                            onSubmitQuotation={() => setIsQuotationModalOpen(true)}
                             approvalStatus={inquiry.approval_status}
                             scheduledDate={inquiry.scheduled_date}
                         />
@@ -739,6 +795,22 @@ const InquiryItemDetailPage = () => {
                     try {
                         const r = await fetchInspectionReportsByInquiryId(inquiryId);
                         setInspectionReports(Array.isArray(r) ? r : []);
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }}
+            />
+
+            <PartnerQuotationModal
+                isOpen={isQuotationModalOpen}
+                onClose={() => setIsQuotationModalOpen(false)}
+                inquiryId={inquiryId}
+                customerId={inquiry.customer_id}
+                partnerId={inquiry.partner_id}
+                onSuccess={async () => {
+                    try {
+                        const q = await fetchQuotationByInquiryId(inquiryId);
+                        setQuotation(q);
                     } catch (e) {
                         console.error(e);
                     }

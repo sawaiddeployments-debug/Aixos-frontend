@@ -109,3 +109,27 @@ export const uploadInspectionFile = async ({
         file
     });
 };
+
+/**
+ * Quotation - POST /api/quotation/create
+ */
+export const createQuotation = async ({ inquiryId, partnerId, customerId, estimatedCost, file }) => {
+    if (!file) throw new Error('PDF file is required');
+    const formData = new FormData();
+    formData.append('pdf_file', file);
+    formData.append('inquiry_id', inquiryId);
+    formData.append('partner_id', partnerId);
+    formData.append('customer_id', customerId);
+    formData.append('estimated_cost', estimatedCost);
+
+    const response = await client.post('/quotation/create', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return extractApiData(response, null);
+};
+
+/** GET /quotation/:inquiryId - returns quotation row */
+export const fetchQuotationByInquiryId = async (inquiryId) => {
+    const response = await client.get(`/quotations/${inquiryId}`);
+    return extractApiData(response, null);
+};

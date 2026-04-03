@@ -103,6 +103,7 @@ const CustomerDashboard = () => {
     const [history, setHistory] = useState([]);
     const [inquiries, setInquiries] = useState([]);
     const [quotations, setQuotations] = useState([]);
+    const [maintenanceQuotations, setMaintenanceQuotations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [apiError, setApiError] = useState('');
     const [inquiriesApiUnavailable, setInquiriesApiUnavailable] = useState(false);
@@ -118,7 +119,7 @@ const CustomerDashboard = () => {
             setLoading(true);
             setApiError('');
             try {
-                const [invRes, histRes, inqRes, quoRes] = await Promise.all([
+                const [invRes, histRes, inqRes, quoRes, maintQuoRes] = await Promise.all([
                     // Equipment source for customer dashboard = inquiry_items (predictable, holds capacity/expiry/etc).
                     supabase
                         .from('inquiry_items')
@@ -135,11 +136,17 @@ const CustomerDashboard = () => {
                         console.warn('[CustomerDashboard] quotations API:', e?.message || e);
                         setQuotesApiUnavailable(true);
                         return [];
-                    })
+                    }),
+                    supabase
+                        .from('quotations')
+                        .select('*')
+                        .eq('customer_id', user.id)
+                        .order('created_at', { ascending: false })
                 ]);
 
                 if (invRes.error) throw invRes.error;
                 if (histRes.error) throw histRes.error;
+                if (maintQuoRes.error) throw maintQuoRes.error;
 
                 setInventory(invRes.data || []);
                 setHistory(histRes.data || []);
@@ -151,6 +158,7 @@ const CustomerDashboard = () => {
 
                 setInquiries(normalizeCustomerInquiries(inqList));
                 setQuotations(quoList);
+                setMaintenanceQuotations(maintQuoRes.data || []);
 
                 if (import.meta.env.DEV) {
                     console.debug('[CustomerDashboard] loaded', {
@@ -527,10 +535,11 @@ const CustomerDashboard = () => {
                     </h2>
                 </div>
                 <div className="p-6">
-                    {quotations.length === 0 ? (
+                    {quotations.length === 0 && maintenanceQuotations.length === 0 ? (
                         <p className="text-slate-500 text-sm">No quotations yet. When a partner sends a quote, it will appear here.</p>
                     ) : (
                         <div className="space-y-4">
+                            {/* General Quotations */}
                             {quotations.map((q) => {
                                 const pending =
                                     (q.status || '').toLowerCase() === 'pending' ||
@@ -568,6 +577,43 @@ const CustomerDashboard = () => {
                                     </div>
                                 );
                             })}
+                            
+                            {/* Maintenance Quotations */}
+                            {maintenanceQuotations.map((mq) => (
+                                <div
+                                    key={mq.id}
+                                    className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-slate-100 shadow-sm hover:border-primary-200 transition-all group"
+                                >
+                                    <div className="flex items-start gap-4">
+                                        <div className="p-3 bg-primary-50 text-primary-600 rounded-xl group-hover:bg-primary-100 transition-colors">
+                                            <FileText size={20} />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-bold text-slate-900">Maintenance Quotation</p>
+                                                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-black uppercase rounded-md tracking-wider">New</span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 mt-1">
+                                               For Inquiry: <span className="font-bold text-slate-700">#{mq.inquiry_id?.slice(0, 8)}…</span> · 
+                                               Estimated Cost: <span className="font-bold text-emerald-600">${mq.estimated_cost}</span>
+                                            </p>
+                                            <p className="text-[10px] text-slate-400 mt-1">Submitted: {new Date(mq.created_at).toLocaleDateString()}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        {mq.pdf_url && (
+                                            <a
+                                                href={mq.pdf_url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 flex items-center gap-2"
+                                            >
+                                                Download PDF
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>

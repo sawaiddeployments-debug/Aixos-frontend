@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../context/AuthContext';
-import { MapPin, Users, CheckCircle, DollarSign, Clock, ArrowRight, TrendingUp, MessageSquare, Calendar } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { MapPin, Users, CheckCircle, DollarSign, Clock, ArrowRight, TrendingUp, MessageSquare, Calendar, Eye } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -51,6 +51,8 @@ const AgentDashboard = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedQueryId, setSelectedQueryId] = useState(null);
   const markerRef = useRef(null);
+
+  const navigate = useNavigate();
 
   const getWeekNumber = (date) => {
     const d = new Date(date);
@@ -413,9 +415,7 @@ const AgentDashboard = () => {
           <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <MessageSquare size={22} className="text-secondary-500" /> Recent Queries
           </h3>
-          <Link to="/agent/queries" className="text-primary-500 hover:text-primary-600 font-medium flex items-center gap-1 text-sm">
-            View All <ArrowRight size={14} />
-          </Link>
+
         </div>
         <div className="overflow-x-auto max-h-[400px] overflow-y-auto custom-scrollbar relative">
           <table className="w-full text-left border-collapse">
@@ -424,7 +424,7 @@ const AgentDashboard = () => {
                 <th className="px-6 py-4">Query No</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Due Date</th>
-                <th className="px-6 py-4">Remarks</th>
+                {/* <th className="px-6 py-4">Remarks</th> */}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -463,9 +463,10 @@ const AgentDashboard = () => {
                         <Calendar size={14} className="text-slate-400" />
                         {query.visits?.follow_up_date ? new Date(query.visits.follow_up_date).toLocaleDateString() : 'No date set'}
                       </div>
+
                     </td>
                     <td className="px-6 py-4 text-right flex items-center justify-center gap-2">
-                      <button
+                      {/* <button
                         onClick={() => {
                           setSelectedQueryId(query.id);
                           setIsChatOpen(true);
@@ -474,8 +475,18 @@ const AgentDashboard = () => {
                         title="View Conversation"
                       >
                         <MessageSquare size={20} />
-                      </button>
+                      </button> */}
 
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/agent/query/${query.id}`);
+                        }}
+                        className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                        title="View Details"
+                      >
+                        <Eye size={16} />
+                      </button>
                     </td>
 
                   </tr>

@@ -977,9 +977,11 @@ const VisitForm = () => {
       {/* Header / Stepper */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500">
-            <ArrowLeft size={24} />
-          </button>
+          {step === 1 && (
+            <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500">
+              <ArrowLeft size={24} />
+            </button>
+          )}
           <div>
             <h1 className="text-3xl font-display font-bold text-slate-900">Log Visit</h1>
             <p className="text-slate-500">Step {step} of 3</p>
@@ -1322,10 +1324,14 @@ const VisitForm = () => {
                   {['Validation', 'Refill', 'New Unit', 'Maintenance'].map((m) => (
                     <button
                       key={m}
+                      type="button"
+                      disabled={ext.isLocked}
                       onClick={() => handleExtinguisherChange(index, 'mode', m)}
-                      className={`w-full py-2 rounded-lg text-xs font-bold transition-all ${ext.mode === m ? 'bg-primary-500 text-white shadow-md' :
-                        'bg-white text-slate-400 border border-slate-200 hover:bg-slate-50'
-                        }`}
+                      className={`w-full py-2 rounded-lg text-xs font-bold transition-all ${
+                        ext.mode === m 
+                          ? 'bg-primary-500 text-white shadow-md' 
+                          : 'bg-white text-slate-400 border border-slate-200 hover:bg-slate-50'
+                      } ${ext.isLocked ? 'cursor-not-allowed opacity-60' : ''}`}
                     >
                       {m}
                     </button>
@@ -1412,7 +1418,8 @@ const VisitForm = () => {
                             id={`ff-system-${index}`}
                             value={ext.firefightingSystem || ''}
                             onChange={(e) => handleExtinguisherChange(index, 'firefightingSystem', e.target.value)}
-                            className="input-field py-2 text-sm bg-white cursor-pointer"
+                            disabled={ext.isLocked}
+                            className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : 'bg-white cursor-pointer'}`}
                           >
                             <option value="">Select...</option>
                             {Object.keys(FIRE_FIGHTING_CATEGORIES).map(sys => (
@@ -1429,8 +1436,9 @@ const VisitForm = () => {
                                 type="text"
                                 value={ext.customFirefightingSystem || ''}
                                 onChange={(e) => handleExtinguisherChange(index, 'customFirefightingSystem', e.target.value)}
+                                disabled={ext.isLocked}
                                 placeholder="e.g. Clean Agent System, etc."
-                                className="input-field py-2 text-sm"
+                                className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : ''}`}
                                 required
                               />
                             </div>
@@ -1453,7 +1461,8 @@ const VisitForm = () => {
                               handleExtinguisherChange(index, 'material', mat);
                               handleExtinguisherChange(index, 'unit', getDefaultUnit(mat));
                             }}
-                            className={`input-field py-2 text-sm ${!ext.firefightingSystem ? 'bg-slate-50 cursor-not-allowed opacity-60' : 'bg-white cursor-pointer'}`}
+                            disabled={ext.isLocked || !ext.firefightingSystem}
+                            className={`input-field py-2 text-sm ${ext.isLocked || !ext.firefightingSystem ? 'bg-slate-50 cursor-not-allowed opacity-60' : 'bg-white cursor-pointer'}`}
                           >
                             <option value="">Select Material</option>
                             {ext.firefightingSystem &&
@@ -1471,8 +1480,9 @@ const VisitForm = () => {
                                 type="text"
                                 value={ext.customMaterial || ''}
                                 onChange={(e) => handleExtinguisherChange(index, 'customMaterial', e.target.value)}
+                                disabled={ext.isLocked}
                                 placeholder="e.g. Fire Blanket, Fire Curtain, etc."
-                                className="input-field py-2 text-sm"
+                                className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : ''}`}
                                 required
                               />
                             </div>
@@ -1544,8 +1554,8 @@ const VisitForm = () => {
                           <select
                             value={ext.partner || ''}
                             onChange={(e) => handleExtinguisherChange(index, 'partner', e.target.value)}
-                            className="input-field py-2 text-sm"
-                            disabled={loadingPartners}
+                            className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : ''}`}
+                            disabled={loadingPartners || ext.isLocked}
                           >
                             <option value="">{loadingPartners ? 'Loading Partners...' : 'Select Partner'}</option>
                             {partners.map(p => (
@@ -1562,8 +1572,9 @@ const VisitForm = () => {
                                 type="text"
                                 value={ext.customPartner || ''}
                                 onChange={(e) => handleExtinguisherChange(index, 'customPartner', e.target.value)}
+                                disabled={ext.isLocked}
                                 placeholder="e.g. ABC Fire Refilling Co."
-                                className="input-field py-2 text-sm"
+                                className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : ''}`}
                               />
                             </div>
                           )}
@@ -1574,7 +1585,8 @@ const VisitForm = () => {
                             type="date"
                             value={ext.expiryDate}
                             onChange={(e) => handleExtinguisherChange(index, 'expiryDate', e.target.value)}
-                            className="input-field py-2 text-sm"
+                            disabled={ext.isLocked}
+                            className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : ''}`}
                           />
                         </div>
                       </div>
@@ -1684,8 +1696,8 @@ const VisitForm = () => {
                         <select
                           value={ext.partner}
                           onChange={(e) => handleExtinguisherChange(index, 'partner', e.target.value)}
-                          className="input-field py-2 text-sm"
-                          disabled={loadingPartners}
+                          className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : ''}`}
+                          disabled={loadingPartners || ext.isLocked}
                         >
                           <option value="">{loadingPartners ? 'Loading Partners...' : 'Select Partner'}</option>
                           {partners.map(p => (
@@ -1703,8 +1715,9 @@ const VisitForm = () => {
                               type="text"
                               value={ext.customPartner || ''}
                               onChange={(e) => handleExtinguisherChange(index, 'customPartner', e.target.value)}
+                              disabled={ext.isLocked}
                               placeholder="e.g. ABC Fire Refilling Co."
-                              className="input-field py-2 text-sm"
+                              className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : ''}`}
                             />
                           </div>
                         )}
@@ -1717,7 +1730,8 @@ const VisitForm = () => {
                           value={ext.quantity}
                           min={1}
                           onChange={(e) => handleExtinguisherChange(index, 'quantity', parseInt(e.target.value) || 1)}
-                          className="input-field py-2 text-sm"
+                          disabled={ext.isLocked}
+                          className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : ''}`}
                         />
                       </div>
 
@@ -1727,7 +1741,8 @@ const VisitForm = () => {
                           type="date"
                           value={ext.expiryDate}
                           onChange={(e) => handleExtinguisherChange(index, 'expiryDate', e.target.value)}
-                          className="input-field py-2 text-sm"
+                          disabled={ext.isLocked}
+                          className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : ''}`}
                         />
                       </div>
                     </>
@@ -1749,7 +1764,8 @@ const VisitForm = () => {
                               id={`ff-system-maint-${index}`}
                               value={ext.firefightingSystem || ''}
                               onChange={(e) => handleExtinguisherChange(index, 'firefightingSystem', e.target.value)}
-                              className="input-field py-2 text-sm bg-white cursor-pointer"
+                              disabled={ext.isLocked}
+                              className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : 'bg-white cursor-pointer'}`}
                             >
                               <option value="">Select Category...</option>
                               {Object.keys(FIRE_FIGHTING_CATEGORIES).map(sys => (
@@ -1770,8 +1786,9 @@ const VisitForm = () => {
                                   type="text"
                                   value={ext.customFirefightingSystem || ''}
                                   onChange={(e) => handleExtinguisherChange(index, 'customFirefightingSystem', e.target.value)}
+                                  disabled={ext.isLocked}
                                   placeholder="e.g. Clean Agent System, etc."
-                                  className="input-field py-2 text-sm"
+                                  className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : ''}`}
                                   required
                                 />
                               </div>
@@ -1793,7 +1810,8 @@ const VisitForm = () => {
                                 handleExtinguisherChange(index, 'material', mat);
                                 handleExtinguisherChange(index, 'unit', getDefaultUnit(mat));
                               }}
-                              className={`input-field py-2 text-sm ${!ext.firefightingSystem ? 'bg-slate-50 cursor-not-allowed opacity-60' : 'bg-white cursor-pointer'}`}
+                              disabled={ext.isLocked || !ext.firefightingSystem}
+                              className={`input-field py-2 text-sm ${ext.isLocked || !ext.firefightingSystem ? 'bg-slate-50 cursor-not-allowed opacity-60' : 'bg-white cursor-pointer'}`}
                             >
                               <option value="">Select Material...</option>
                               {ext.firefightingSystem &&
@@ -1815,8 +1833,9 @@ const VisitForm = () => {
                                   type="text"
                                   value={ext.customMaterial || ''}
                                   onChange={(e) => handleExtinguisherChange(index, 'customMaterial', e.target.value)}
+                                  disabled={ext.isLocked}
                                   placeholder="e.g. Fire Blanket, Fire Curtain, etc."
-                                  className="input-field py-2 text-sm"
+                                  className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : ''}`}
                                   required
                                 />
                               </div>
@@ -1876,7 +1895,6 @@ const VisitForm = () => {
                           </button>
                         </div>
                         {/* Partner (same as New Unit) */}
-                        <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
                           <div>
                             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">
                               Partner
@@ -1884,8 +1902,8 @@ const VisitForm = () => {
                             <select
                               value={ext.partner || ''}
                               onChange={(e) => handleExtinguisherChange(index, 'partner', e.target.value)}
-                              className="input-field py-2 text-sm"
-                              disabled={loadingPartners}
+                              className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : ''}`}
+                              disabled={loadingPartners || ext.isLocked}
                             >
                               <option value="">{loadingPartners ? 'Loading Partners...' : 'Select Partner'}</option>
                               {partners.map(p => (
@@ -1902,8 +1920,9 @@ const VisitForm = () => {
                                   type="text"
                                   value={ext.customPartner || ''}
                                   onChange={(e) => handleExtinguisherChange(index, 'customPartner', e.target.value)}
+                                  disabled={ext.isLocked}
                                   placeholder="e.g. ABC Fire Refilling Co."
-                                  className="input-field py-2 text-sm"
+                                  className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : ''}`}
                                 />
                               </div>
                             )}
@@ -1914,10 +1933,10 @@ const VisitForm = () => {
                               type="date"
                               value={ext.expiryDate}
                               onChange={(e) => handleExtinguisherChange(index, 'expiryDate', e.target.value)}
-                              className="input-field py-2 text-sm"
+                              disabled={ext.isLocked}
+                              className={`input-field py-2 text-sm ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed opacity-60' : ''}`}
                             />
                           </div>
-                        </div>
                         {ext.newUnits?.length > 0 && (
                           <div className="mt-6 space-y-4">
                             <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
@@ -1965,8 +1984,9 @@ const VisitForm = () => {
                                           )
                                         );
                                       }}
-                                      className="p-2 rounded-full bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-300"
-                                      title="Remove this sub-unit"
+                                      disabled={ext.isLocked}
+                                      className={`p-2 rounded-full transition-colors focus:outline-none focus:ring-2 ${ext.isLocked ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 focus:ring-red-300'}`}
+                                      title={ext.isLocked ? "Unit is locked" : "Remove this sub-unit"}
                                     >
                                       <Trash size={16} />
                                     </button>
@@ -1991,14 +2011,16 @@ const VisitForm = () => {
 
                             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                               <button
-                                onMouseDown={() => startUnitRecording(index)}
+                                type="button"
+                                onMouseDown={() => !ext.isLocked && startUnitRecording(index)}
                                 onMouseUp={stopUnitRecording}
-                                onTouchStart={() => startUnitRecording(index)}
+                                onTouchStart={() => !ext.isLocked && startUnitRecording(index)}
                                 onTouchEnd={stopUnitRecording}
+                                disabled={ext.isLocked}
                                 className={`w-14 h-14 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${recordingIndex === index && isRecording
                                   ? 'bg-red-500 animate-pulse text-white scale-110 shadow-lg shadow-red-500/30'
                                   : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                                  }`}
+                                  } ${ext.isLocked ? 'cursor-not-allowed opacity-50' : ''}`}
                               >
                                 {recordingIndex === index && isRecording ? <Square size={20} /> : <Mic size={20} />}
                               </button>
@@ -2046,7 +2068,8 @@ const VisitForm = () => {
                                         return copy;
                                       });
                                     }}
-                                    className="text-red-500 hover:text-red-600 text-xs"
+                                    disabled={ext.isLocked}
+                                    className={`text-xs ${ext.isLocked ? 'text-slate-300 cursor-not-allowed' : 'text-red-500 hover:text-red-600'}`}
                                   >
                                     Remove
                                   </button>
@@ -2063,7 +2086,8 @@ const VisitForm = () => {
                             <textarea
                               value={ext.maintenanceNotes || ''}
                               onChange={(e) => handleExtinguisherChange(index, 'maintenanceNotes', e.target.value)}
-                              className="w-full h-28 resize-none border border-slate-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+                              disabled={ext.isLocked}
+                              className={`w-full h-28 resize-none border border-slate-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 ${ext.isLocked ? 'bg-slate-50 text-slate-500 cursor-not-allowed' : ''}`}
                               placeholder="Condition, problems found, work done, recommendations for this unit..."
                             />
                           </div>
@@ -2074,10 +2098,11 @@ const VisitForm = () => {
                           <label className="block text-sm font-bold text-slate-700 mb-2">
                             Unit Picture <span className="text-xs text-slate-500 font-normal">(recommended)</span>
                           </label>
-                          <div className="relative border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center hover:border-primary-500 transition-colors cursor-pointer">
+                          <div className={`relative border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col items-center justify-center transition-colors ${ext.isLocked ? 'bg-slate-50 cursor-not-allowed border-slate-200' : 'hover:border-primary-500 cursor-pointer'}`}>
                             <input
                               type="file"
                               accept="image/*"
+                              disabled={ext.isLocked}
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
@@ -2086,21 +2111,21 @@ const VisitForm = () => {
                                   ));
                                 }
                               }}
-                              className="absolute inset-0 opacity-0 cursor-pointer"
+                              className={`absolute inset-0 opacity-0 ${ext.isLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                             />
                             {ext.maintenanceUnitPhoto ? (
                               <div className="flex flex-col items-center">
                                 <img
                                   src={URL.createObjectURL(ext.maintenanceUnitPhoto)}
                                   alt="Unit preview"
-                                  className="h-24 w-24 object-cover rounded-lg mb-3 border shadow-sm"
+                                  className={`h-24 w-24 object-cover rounded-lg mb-3 border shadow-sm ${ext.isLocked ? 'opacity-50' : ''}`}
                                 />
-                                <p className="text-xs text-slate-600">Click to change</p>
+                                <p className="text-xs text-slate-600">{ext.isLocked ? 'Photo Locked' : 'Click to change'}</p>
                               </div>
                             ) : (
                               <>
-                                <Camera size={32} className="text-slate-400 mb-3" />
-                                <p className="text-sm text-slate-500">Tap to upload unit photo</p>
+                                <Camera size={32} className={`mb-3 ${ext.isLocked ? 'text-slate-300' : 'text-slate-400'}`} />
+                                <p className={`text-sm ${ext.isLocked ? 'text-slate-400' : 'text-slate-500'}`}>{ext.isLocked ? 'Upload Locked' : 'Tap to upload unit photo'}</p>
                               </>
                             )}
                           </div>
