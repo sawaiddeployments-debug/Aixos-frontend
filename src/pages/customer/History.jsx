@@ -230,7 +230,7 @@ const History = () => {
                                 {service.amount > 0 && (
                                     <div className="ml-auto text-right">
                                         <span className="block text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Total</span>
-                                        <p className="text-lg font-bold text-slate-900">${service.amount}</p>
+                                        <p className="text-lg font-bold text-slate-900">SAR {service.amount}</p>
                                     </div>
                                 )}
                             </div>

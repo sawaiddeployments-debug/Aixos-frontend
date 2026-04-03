@@ -324,7 +324,7 @@ const QueryDetail = () => {
                                 <div>
                                     <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Estimated Cost</p>
                                     <p className="text-2xl font-black text-slate-900 tracking-tight">
-                                        {quotation.estimated_cost ? `$${quotation.estimated_cost}` : '—'}
+                                        {quotation.estimated_cost ? `SAR ${quotation.estimated_cost}` : '—'}
                                     </p>
                                 </div>
                                 <div>

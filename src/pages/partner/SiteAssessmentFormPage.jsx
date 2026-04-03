@@ -162,7 +162,7 @@ const SiteAssessmentFormPage = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                                Estimated cost ($)
+                                Estimated cost (SAR)
                             </label>
                             <input
                                 type="number"

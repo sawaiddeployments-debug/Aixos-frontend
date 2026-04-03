@@ -556,7 +556,7 @@ const CustomerDashboard = () => {
                                             </p>
                                             <p className="text-xs text-slate-500 mt-1">
                                                 Inquiry: {q.inquiry_no || q.inquiry_id || '—'} · Amount:{' '}
-                                                {q.amount != null ? `$${Number(q.amount).toLocaleString()}` : '—'}
+                                                {q.amount != null ? `SAR ${Number(q.amount).toLocaleString()}` : '—'}
                                             </p>
                                             <p className="text-xs text-slate-400 mt-1 capitalize">Status: {q.status || '—'}</p>
                                         </div>
@@ -595,7 +595,7 @@ const CustomerDashboard = () => {
                                             </div>
                                             <p className="text-xs text-slate-500 mt-1">
                                                For Inquiry: <span className="font-bold text-slate-700">#{mq.inquiry_id?.slice(0, 8)}…</span> · 
-                                               Estimated Cost: <span className="font-bold text-emerald-600">${mq.estimated_cost}</span>
+                                               Estimated Cost: <span className="font-bold text-emerald-600">SAR {mq.estimated_cost}</span>
                                             </p>
                                             <p className="text-[10px] text-slate-400 mt-1">Submitted: {new Date(mq.created_at).toLocaleDateString()}</p>
                                         </div>

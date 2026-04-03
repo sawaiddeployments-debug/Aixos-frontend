@@ -200,7 +200,7 @@ const AgentPerformance = () => {
         <StatCard
           icon={DollarSign}
           title="Total Value"
-          value={`$${summary.totalValue}`}
+          value={`SAR ${summary.totalValue}`}
           color="bg-orange-500"
         />
         <div className="bg-white rounded-3xl p-4 shadow-soft border border-slate-100">
@@ -338,11 +338,8 @@ const AgentPerformance = () => {
                         {row.closed}
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-center text-slate-700">
-                      {row.quantity}
-                    </td>
                     <td className="px-5 py-4 text-right font-semibold text-orange-600">
-                      ${row.value}
+                      SAR {row.value}
                     </td>
                   </tr>
                 </Link>
@@ -364,7 +361,7 @@ const AgentPerformance = () => {
                   {tableData.reduce((sum, r) => sum + r.quantity, 0)}
                 </td>
                 <td className="px-5 py-4 text-right text-orange-600">
-                  ${tableData.reduce((sum, r) => sum + r.value, 0)}
+                  SAR {tableData.reduce((sum, r) => sum + r.value, 0)}
                 </td>
               </tr>
             </tbody>

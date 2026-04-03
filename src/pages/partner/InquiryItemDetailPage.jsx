@@ -499,7 +499,7 @@ const InquiryItemDetailPage = () => {
                             <DetailField label="Quantity" value={formatVal(item.quantity)} />
                             <DetailField
                                 label="Unit price"
-                                value={item.price != null ? `$${item.price}` : '—'}
+                                value={item.price != null ? `SAR ${item.price}` : '—'}
                             />
                             <DetailField label="Condition" value={formatVal(item.condition)} />
                             <DetailField label="Item status" value={formatVal(item.status)} />
@@ -610,11 +610,11 @@ const InquiryItemDetailPage = () => {
                                                     </p>
                                                 </div>
                                                 <DetailField
-                                                    label="Estimated cost ($)"
+                                                    label="Estimated cost (SAR)"
                                                     value={
                                                         siteAssessment.estimated_cost != null &&
                                                             siteAssessment.estimated_cost !== ''
-                                                            ? `$${siteAssessment.estimated_cost}`
+                                                            ? `SAR ${siteAssessment.estimated_cost}`
                                                             : '—'
                                                     }
                                                 />
@@ -700,8 +700,8 @@ const InquiryItemDetailPage = () => {
                                         {quotation ? (
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                 <DetailField
-                                                    label="Estimated cost ($)"
-                                                    value={quotation.estimated_cost ? `$${quotation.estimated_cost}` : '—'}
+                                                    label="Estimated cost (SAR)"
+                                                    value={quotation.estimated_cost ? `SAR ${quotation.estimated_cost}` : '—'}
                                                 />
                                                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
                                                     <div>

@@ -36,10 +36,10 @@ const QuotationModal = ({ isOpen, onClose, inquiry, onSubmit }) => {
 
                 <form onSubmit={handleSubmit} className="p-8 pt-4 space-y-6">
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Total Amount ($)</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Total Amount (SAR)</label>
                         <div className="relative">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                                <DollarSign size={18} />
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 flex items-center justify-center">
+                                <span className="text-[10px] font-bold">SAR</span>
                             </div>
                             <input
                                 type="number"

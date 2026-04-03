@@ -34,7 +34,7 @@ const RefillInquiryDetail = ({ viewModel }) => {
 
     const defaultPickupDescription =
         isTransportChargeable && transportChargePerUnit > 0
-            ? `Partner is responsible for pickup. Transportation charges of $${transportChargePerUnit}/unit are added.`
+            ? `Partner is responsible for pickup. Transportation charges of SAR ${transportChargePerUnit}/unit are added.`
             : 'Agent or customer will drop the units. No transport charge per unit applies.';
 
     const pickupBody = pickupStrategyDescription?.trim() ? pickupStrategyDescription : defaultPickupDescription;

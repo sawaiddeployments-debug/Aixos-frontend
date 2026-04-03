@@ -109,7 +109,7 @@ const AdminDashboard = () => {
                 <StatCard
                     icon={DollarSign}
                     title="Total Revenue"
-                    value={`$${stats?.totalRevenue?.toLocaleString() || 0}`}
+                    value={`SAR ${stats?.totalRevenue?.toLocaleString() || 0}`}
                     subtext="Real-time data"
                     color="bg-emerald-500"
                 />

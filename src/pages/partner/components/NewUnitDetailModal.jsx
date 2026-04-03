@@ -231,10 +231,10 @@ const NewUnitDetailModal = ({ isOpen, onClose, inquiry, onUpdate }) => {
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                                 <div className="space-y-3">
                                                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                                                        Price per Unit ($)
+                                                        Price per Unit (SAR)
                                                     </label>
                                                     <div className="relative group">
-                                                        <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 font-bold group-focus-within:text-primary-500 transition-colors">$</div>
+                                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px] group-focus-within:text-primary-500 transition-colors uppercase">SAR</div>
                                                         <input
                                                             type="number"
                                                             min={0}
@@ -264,7 +264,7 @@ const NewUnitDetailModal = ({ isOpen, onClose, inquiry, onUpdate }) => {
                                                         Estimated Total
                                                     </label>
                                                     <div className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl py-5 px-6 font-black text-2xl text-slate-400 cursor-not-allowed flex items-center shadow-inner">
-                                                        <span className="mr-2">$</span>
+                                                        <span className="mr-2 text-xs">SAR</span>
                                                         {estimatedPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </div>
                                                 </div>

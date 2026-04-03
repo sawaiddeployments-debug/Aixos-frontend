@@ -146,7 +146,7 @@ const PartnerDashboard = () => {
                 <StatCard icon={Layout} title="Total Active" value={stats.activeInquiries} color="bg-primary-500" subtitle="Inquiries" />
                 <StatCard icon={Clock} title="Total Pending" value={stats.pendingInquiries} color="bg-amber-500" subtitle="Awaiting Action" />
                 <StatCard icon={CheckCircle2} title="Total Closed" value={stats.closedInquiries} color="bg-emerald-500" subtitle="Past 30 Days" />
-                <StatCard icon={DollarSign} title="Total Sales" value={`$${(stats.totalSales || 0).toLocaleString()}`} color="bg-indigo-500" subtitle="Gross Profit" />
+                <StatCard icon={DollarSign} title="Total Sales" value={`SAR ${(stats.totalSales || 0).toLocaleString()}`} color="bg-indigo-500" subtitle="Gross Profit" />
                 <StatCard icon={Users} title="Total Agents" value={stats.totalAgents || 0} color="bg-pink-500" subtitle="Active Field Teams" />
             </div>
 

@@ -327,7 +327,7 @@ const AgentDashboard = () => {
         <StatCard
           icon={DollarSign}
           title="Total Earnings"
-          value={`$${stats.earnings}`}
+          value={`SAR ${stats.earnings}`}
           color="bg-orange-500"
         />
       </div>
