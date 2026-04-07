@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, MessageCircle, MoreVertical, Loader2 } from 'lucide-react';
 import { getDirectMessagesHistory, sendDirectMessage, updateDirectMessageStatus, markMessagesAsRead } from '../../api/chatApi';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../supabaseClient';
 
 /**
  * Reusable Chat Box for Inquiry Discussions
@@ -84,9 +85,37 @@ const InquiryChatBox = ({ inquiryId, recipientId, recipientRole = 'customer', ti
     };
 
     useEffect(() => {
+        if (!user?.id || !recipientId || !inquiryId) return;
+
         fetchMessages(true);
-        const interval = setInterval(() => fetchMessages(false), 5000); // 5s polling
-        return () => clearInterval(interval);
+
+        // REAL-TIME: Subscribe to new messages for this inquiry
+        console.log('📡 SETTING UP REAL-TIME FOR INQUIRY:', inquiryId);
+        const channel = supabase
+            .channel(`inquiry_messages_${inquiryId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    table: 'messages',
+                    filter: `inquiry_id=eq.${inquiryId}`
+                },
+                (payload) => {
+                    console.log('🔥 NEW MESSAGE VIA REAL-TIME:', payload.new);
+                    setMessages((prev) => {
+                        if (prev.some(m => m.id === payload.new.id)) return prev;
+                        return [...prev, payload.new];
+                    });
+                }
+            )
+            .subscribe((status) => {
+                console.log(`🔌 REAL-TIME STATUS [inquiry_${inquiryId}]:`, status);
+            });
+
+        return () => {
+            console.log('🔌 DISCONNECTING REAL-TIME FOR INQUIRY:', inquiryId);
+            supabase.removeChannel(channel);
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.id, recipientId, inquiryId]);
 

@@ -19,13 +19,15 @@ const Layout = ({ children }) => {
     const location = useLocation();
     const [isChatOpen, setIsChatOpen] = React.useState(false);
     const [selectedQueryId, setSelectedQueryId] = React.useState(null);
+    const [selectedChatContext, setSelectedChatContext] = React.useState(null);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
     // Active Location Tracking
     useLocationTracker();
 
-    const handleOpenChat = (queryId) => {
+    const handleOpenChat = (queryId, context = null) => {
         setSelectedQueryId(queryId);
+        setSelectedChatContext(context);
         setIsChatOpen(true);
     };
 
@@ -222,6 +224,8 @@ const Layout = ({ children }) => {
                 isOpen={isChatOpen}
                 onClose={() => setIsChatOpen(false)}
                 queryId={selectedQueryId}
+                recipientId={selectedChatContext?.senderId}
+                recipientRole={selectedChatContext?.senderRole}
             />
         </div>
     );

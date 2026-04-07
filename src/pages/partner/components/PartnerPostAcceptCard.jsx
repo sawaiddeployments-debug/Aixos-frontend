@@ -13,7 +13,7 @@ const PartnerPostAcceptCard = ({ inquiryId, itemId, onUploadReport, onScheduleDa
     const isRejected = approvalStatus === 'rejected';
 
     return (
-        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-soft-xl p-8 w-full xl:w-[340px] shrink-0 xl:sticky xl:top-6">
+        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-soft-xl p-8 w-full shrink-0">
             <div className="text-center space-y-2 mb-8">
                 <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto border-2 border-emerald-200">
                     <CheckCircle size={32} strokeWidth={2.5} />

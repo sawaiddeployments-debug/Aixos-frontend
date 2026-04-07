@@ -4,8 +4,9 @@ import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
 import { getMessages, sendMessage as sendChatMessage } from '../../api/chatApi'; // Corrected import
 import { useAuth } from '../../context/AuthContext';
+import InquiryChatBox from './InquiryChatBox';
 
-const ChatModal = ({ isOpen, onClose, queryId }) => {
+const ChatModal = ({ isOpen, onClose, queryId, recipientId, recipientRole }) => {
     const [messages, setMessages] = useState([]);
     const [isLoadingInitial, setIsLoadingInitial] = useState(false);
     const [isSending, setIsSending] = useState(false);
@@ -107,89 +108,115 @@ const ChatModal = ({ isOpen, onClose, queryId }) => {
                 className="bg-white w-full max-w-lg h-[600px] max-h-[90vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-300"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Header */}
-                <div className="p-4 sm:p-6 bg-white border-b border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="relative">
-                            <img
-                                src={customer?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${customer?.name || queryId}`}
-                                alt={customer?.name}
-                                className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl object-cover border border-slate-100"
-                            />
-                            <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${customer?.status === 'online' ? 'bg-green-500' : 'bg-slate-300'
-                                }`} />
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-slate-900 text-base sm:text-lg leading-tight">
-                                {customer?.name || (isLoadingInitial ? 'Connecting...' : `Extinguisher Chat`)}
-                            </h3>
-                            <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
-                                <span className={`w-1.5 h-1.5 rounded-full ${customer?.status === 'online' ? 'bg-green-500' : 'bg-slate-300'}`} />
-                                {customer?.status === 'online' ? 'Active now' : customer?.lastSeen || 'Status unknown'}
-                            </p>
-                        </div>
+                {/* Inquiry-based Chat (New System) */}
+                {recipientId && recipientRole ? (
+                    <div className="flex-1 overflow-hidden">
+                        <InquiryChatBox
+                            inquiryId={queryId}
+                            recipientId={recipientId}
+                            recipientRole={recipientRole}
+                            title="Direct Message"
+                            className="h-full border-none shadow-none rounded-none"
+                        />
                     </div>
+                ) : (
+                    <>
+                        {/* Header */}
+                        <div className="p-4 sm:p-6 bg-white border-b border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="relative">
+                                    <img
+                                        src={customer?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${customer?.name || queryId}`}
+                                        alt={customer?.name}
+                                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl object-cover border border-slate-100"
+                                    />
+                                    <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${customer?.status === 'online' ? 'bg-green-500' : 'bg-slate-300'
+                                        }`} />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-900 text-base sm:text-lg leading-tight">
+                                        {customer?.name || (isLoadingInitial ? 'Connecting...' : `Extinguisher Chat`)}
+                                    </h3>
+                                    <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                        <span className={`w-1.5 h-1.5 rounded-full ${customer?.status === 'online' ? 'bg-green-500' : 'bg-slate-300'}`} />
+                                        {customer?.status === 'online' ? 'Active now' : customer?.lastSeen || 'Status unknown'}
+                                    </p>
+                                </div>
+                            </div>
 
-                    <div className="flex items-center gap-1 sm:gap-2">
-                        <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all hidden sm:flex">
-                            <Phone size={20} />
-                        </button>
-                        <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all hidden sm:flex">
-                            <Video size={20} />
-                        </button>
-                        <button
-                            onClick={onClose}
-                            className="p-2 text-slate-400 hover:text-primary-500 hover:bg-primary-50 rounded-xl transition-all ml-1"
-                        >
-                            <X size={20} />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Sub-header */}
-                <div className="px-6 py-2 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Extinguisher ID: #{queryId}</span>
-                    <button className="text-slate-400 hover:text-slate-600 flex items-center gap-1">
-                        <Search size={14} />
-                        <span className="text-[10px] font-bold">Search</span>
-                    </button>
-                </div>
-
-                {/* Chat Area */}
-                <div
-                    ref={scrollRef}
-                    className="flex-1 overflow-y-auto p-6 space-y-2 bg-[#F8FAFC] custom-scrollbar relative"
-                >
-                    {isLoadingInitial ? (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-3">
-                            <Loader2 className="animate-spin text-primary-500" size={32} />
-                            <p className="text-sm font-medium">Loading conversation...</p>
+                            <div className="flex items-center gap-1 sm:gap-2">
+                                <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all hidden sm:flex">
+                                    <Phone size={20} />
+                                </button>
+                                <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all hidden sm:flex">
+                                    <Video size={20} />
+                                </button>
+                                <button
+                                    onClick={onClose}
+                                    className="p-2 text-slate-400 hover:text-primary-500 hover:bg-primary-50 rounded-xl transition-all ml-1"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
-                    ) : error ? (
-                        <div className="h-full flex flex-col items-center justify-center text-red-500 p-6 text-center space-y-2">
-                            <AlertCircle size={32} />
-                            <p className="text-sm font-bold">{error}</p>
-                            <button
-                                onClick={() => fetchMessages(true)}
-                                className="text-xs bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
-                            >
-                                Try Again
+
+                        {/* Sub-header */}
+                        <div className="px-6 py-2 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Extinguisher ID: #{queryId}</span>
+                            <button className="text-slate-400 hover:text-slate-600 flex items-center gap-1">
+                                <Search size={14} />
+                                <span className="text-[10px] font-bold">Search</span>
                             </button>
                         </div>
-                    ) : messages.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2">
-                            <p className="text-sm">No messages yet</p>
-                            <p className="text-xs">Start the conversation below</p>
-                        </div>
-                    ) : (
-                        messages.map((msg) => (
-                            <ChatMessage key={msg.id} message={msg} />
-                        ))
-                    )}
-                </div>
 
-                {/* Input Area */}
-                <ChatInput onSendMessage={handleSendMessage} isLoading={isSending} />
+                        {/* Chat Area */}
+                        <div
+                            ref={scrollRef}
+                            className="flex-1 overflow-y-auto p-6 space-y-2 bg-[#F8FAFC] custom-scrollbar relative"
+                        >
+                            {isLoadingInitial ? (
+                                <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-3">
+                                    <Loader2 className="animate-spin text-primary-500" size={32} />
+                                    <p className="text-sm font-medium">Loading conversation...</p>
+                                </div>
+                            ) : error ? (
+                                <div className="h-full flex flex-col items-center justify-center text-red-500 p-6 text-center space-y-2">
+                                    <AlertCircle size={32} />
+                                    <p className="text-sm font-bold">{error}</p>
+                                    <button
+                                        onClick={() => fetchMessages(true)}
+                                        className="text-xs bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors"
+                                    >
+                                        Try Again
+                                    </button>
+                                </div>
+                            ) : messages.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center text-slate-400 space-y-2">
+                                    <p className="text-sm">No messages yet</p>
+                                    <p className="text-xs">Start the conversation below</p>
+                                </div>
+                            ) : (
+                                messages.map((msg) => {
+                                    const isFromCurrentUser =
+                                        msg.sender_id === user?.id ||
+                                        (msg.sender_type && user?.role &&
+                                            msg.sender_type.toLowerCase() === user.role.toLowerCase());
+
+                                    return (
+                                        <ChatMessage
+                                            key={msg.id}
+                                            message={msg}
+                                            isFromCurrentUser={isFromCurrentUser}
+                                        />
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        {/* Input Area */}
+                        <ChatInput onSendMessage={handleSendMessage} isLoading={isSending} />
+                    </>
+                )}
             </div>
         </div>
     );

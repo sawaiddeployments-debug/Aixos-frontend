@@ -65,8 +65,8 @@ const PartnerQuotationModal = ({ isOpen, onClose, inquiryId, customerId, partner
                             <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Final Professional Estimate</p>
                         </div>
                     </div>
-                    <button 
-                        onClick={onClose} 
+                    <button
+                        onClick={onClose}
                         className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
                     >
                         <X size={20} />
@@ -78,18 +78,14 @@ const PartnerQuotationModal = ({ isOpen, onClose, inquiryId, customerId, partner
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                             Estimated Cost (SAR)
                         </label>
-                        <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors">
-                                <DollarSign size={18} />
-                            </div>
-                            <input
-                                type="text"
-                                placeholder="e.g. 150.00"
-                                value={estimatedCost}
-                                onChange={(e) => setEstimatedCost(e.target.value)}
-                                className="w-full pl-11 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-900 font-bold placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-                            />
-                        </div>
+
+                        <input
+                            type="text"
+                            placeholder="e.g. 150.00"
+                            value={estimatedCost}
+                            onChange={(e) => setEstimatedCost(e.target.value)}
+                            className="w-full pl-6 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-slate-900 font-bold placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+                        />
                     </div>
 
                     <div className="space-y-2">
@@ -141,7 +137,7 @@ const PartnerQuotationModal = ({ isOpen, onClose, inquiryId, customerId, partner
                             </>
                         )}
                     </button>
-                    
+
                     <p className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                         Customer will be notified immediately
                     </p>

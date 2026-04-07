@@ -1,12 +1,15 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 
-const ChatMessage = ({ message }) => {
+const ChatMessage = ({ message, isFromCurrentUser }) => {
     const { content, created_at, sender_id, sender_type, isOptimistic } = message;
     const { user } = useAuth();
 
-    // Requirement 5: If sender_type === loggedInUser.role → show right aligned bubble
-    const isMe = user && (sender_type === user.role);
+    // ←←← Yeh line sabse important hai ←←←
+    // Prop priority > fallback
+    const isMe = isFromCurrentUser !== undefined
+        ? isFromCurrentUser
+        : (user && sender_type === user.role);
 
     // Format timestamp
     const timestamp = new Date(created_at).toLocaleTimeString([], {
@@ -21,19 +24,19 @@ const ChatMessage = ({ message }) => {
 
     const avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${sender_id || 'system'}`;
 
-    // Requirement 5: Different style for customer / agent / partner
     const getRoleStyles = () => {
-        if (isMe) return 'bg-primary-500 text-white rounded-br-none shadow-primary-200';
+        if (isMe)
+            return 'bg-primary-500 text-white rounded-br-none shadow-primary-200';
 
         switch (sender_type) {
             case 'customer':
-                return 'bg-blue-50 text-blue-900 border-blue-100 rounded-bl-none';
+                return 'bg-blue-50 text-blue-900 border border-blue-100 rounded-bl-none';
             case 'agent':
-                return 'bg-emerald-50 text-emerald-900 border-emerald-100 rounded-bl-none';
+                return 'bg-emerald-50 text-emerald-900 border border-emerald-100 rounded-bl-none';
             case 'partner':
-                return 'bg-purple-50 text-purple-900 border-purple-100 rounded-bl-none';
+                return 'bg-purple-50 text-purple-900 border border-purple-100 rounded-bl-none';
             default:
-                return 'bg-white text-slate-700 border-slate-100 rounded-bl-none';
+                return 'bg-white text-slate-700 border border-slate-100 rounded-bl-none';
         }
     };
 
@@ -49,6 +52,7 @@ const ChatMessage = ({ message }) => {
     return (
         <div className={`flex w-full mb-4 px-2 ${isMe ? 'justify-end' : 'justify-start'} ${isOptimistic ? 'opacity-70' : 'opacity-100'} transition-opacity duration-300`}>
             <div className={`flex max-w-[85%] sm:max-w-[75%] ${isMe ? 'flex-row-reverse' : 'flex-row'} items-end gap-3`}>
+
                 {/* Avatar */}
                 <div className="flex-shrink-0 mb-1">
                     <img

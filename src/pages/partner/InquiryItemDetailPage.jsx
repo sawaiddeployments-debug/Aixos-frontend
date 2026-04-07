@@ -32,9 +32,9 @@ import InquiryChatBox from '../../components/Chat/InquiryChatBox';
 import PartnerInspectionReportModal from './components/PartnerInspectionReportModal';
 import PartnerQuotationModal from './components/PartnerQuotationModal';
 import { toast } from 'react-hot-toast';
-import { 
-    scheduleMaintenanceVisit, 
-    fetchQuotationByInquiryId 
+import {
+    scheduleMaintenanceVisit,
+    fetchQuotationByInquiryId
 } from '../../api/maintenanceApi';
 
 const statusBadgeClass = (status) => {
@@ -114,7 +114,7 @@ const MediaLink = ({ href, label, icon: Icon, isAudio = false }) => {
 };
 
 const PartnerActionCard = ({ onAccept, onReject, disabled }) => (
-    <div className="bg-white rounded-[2rem] border border-slate-100 shadow-soft-xl p-8 w-full xl:w-[300px] shrink-0 xl:sticky xl:top-6">
+    <div className="bg-white rounded-[2rem] border border-slate-100 shadow-soft-xl p-8 w-full shrink-0 uppercase tracking-widest text-xs font-bold text-slate-500">
         <h4 className="text-center font-bold text-slate-600 mb-6 uppercase tracking-widest text-xs">
             Awaiting partner action
         </h4>
@@ -330,49 +330,47 @@ const InquiryItemDetailPage = () => {
                 Back to Inquiry Items
             </Link>
 
-            <div className="flex flex-col xl:flex-row gap-8 items-start">
-                <div className="flex-1 min-w-0 w-full bg-white rounded-[2rem] border border-slate-100 shadow-soft-xl p-6 md:p-10 space-y-10">
-                    {/* Top: badges + extinguisher */}
-                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
-                        <div className="space-y-3">
+            <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
+
+                {/* Main Content Area */}
+                <div className="flex-1 min-w-0 w-full bg-white rounded-3xl border border-slate-100 shadow-soft-xl p-5 md:p-8 lg:p-10 space-y-10">
+
+                    {/* Top: Badges + Extinguisher Info */}
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                        <div className="space-y-3 flex-1">
                             <div className="flex flex-wrap items-center gap-3">
-                                <span className="px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-slate-100 text-slate-700 border border-slate-200">
+                                <span className="px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest bg-slate-100 text-slate-700 border border-slate-200">
                                     {inquiry.inquiry_no || `INQ-${inquiryId}`}
                                 </span>
-                                <span
-                                    className={`px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border ${statusBadgeClass(displayStatus)}`}
-                                >
+                                <span className={`px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border ${statusBadgeClass(displayStatus)}`}>
                                     {displayStatus}
                                 </span>
-                                <span className="px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-widest bg-slate-900 text-white border border-slate-800">
+                                <span className="px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest bg-slate-900 text-white border border-slate-800">
                                     Line #{item.id}
                                 </span>
                             </div>
-                            <p className="text-xs text-slate-400 font-mono flex items-center gap-2">
+                            <p className="text-xs text-slate-400 font-mono flex items-center gap-2 flex-wrap">
                                 <Hash size={12} />
-                                Inquiry ID {shortId(inquiry.id)} · Visit #{formatVal(inquiry.visit_id)} · Agent #
-                                {formatVal(inquiry.agent_id)}
+                                Inquiry ID {shortId(inquiry.id)} · Visit #{formatVal(inquiry.visit_id)} · Agent #{formatVal(inquiry.agent_id)}
                             </p>
                         </div>
 
-                        <div className="flex items-start gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 lg:min-w-[220px]">
-                            <div className="p-2.5 rounded-xl bg-primary-100 text-primary-600">
-                                <FileText size={22} />
+                        <div className="flex items-start gap-4 p-5 rounded-2xl bg-slate-50 border border-slate-100 lg:min-w-[240px] shrink-0">
+                            <div className="p-3 rounded-xl bg-primary-100 text-primary-600">
+                                <FileText size={24} />
                             </div>
-                            <div>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-                                    Extinguisher ID
-                                </p>
-                                <p className="text-lg font-black text-slate-900 tracking-tight">{extinguisherLabel(item)}</p>
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Extinguisher ID</p>
+                                <p className="text-lg font-black text-slate-900 tracking-tight break-words">{extinguisherLabel(item)}</p>
                                 <p className="text-[10px] text-slate-500 mt-1 font-mono">DB id {item.extinguisher_id ?? '—'}</p>
                             </div>
                         </div>
                     </div>
 
-                    {/* Customer header */}
+                    {/* Customer Header */}
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-                        <div>
-                            <h1 className="text-3xl md:text-4xl font-display font-black text-slate-900 tracking-tight mb-3">
+                        <div className="flex-1 min-w-0">
+                            <h1 className="text-3xl md:text-4xl font-display font-black text-slate-900 tracking-tight mb-3 break-words">
                                 {businessName}
                             </h1>
                             <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -383,9 +381,8 @@ const InquiryItemDetailPage = () => {
                                 <button
                                     type="button"
                                     onClick={openChat}
-                                    className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black uppercase tracking-widest px-5 py-3 rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium px-6 py-3 rounded-2xl shadow-lg transition-all disabled:opacity-50 w-full sm:w-auto"
                                     disabled={!chatExtinguisherId}
-                                    title={!chatExtinguisherId ? 'Link an extinguisher to enable chat' : 'Open chat'}
                                 >
                                     <MessageCircle size={18} />
                                     Message Customer
@@ -394,113 +391,88 @@ const InquiryItemDetailPage = () => {
                         </div>
                     </div>
 
-                    {/* Customer contact */}
+                    {/* Customer Contact */}
                     <div>
                         <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <User size={16} />
-                            Customer contact
+                            <User size={16} /> Customer Contact
                         </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <DetailField label="Owner" value={formatVal(customer.owner_name)} />
                             <DetailField
                                 label="Email"
                                 value={
                                     customer.email ? (
-                                        <a href={`mailto:${customer.email}`} className="text-primary-600 hover:underline">
+                                        <a href={`mailto:${customer.email}`} className="text-primary-600 hover:underline break-all">
                                             {customer.email}
                                         </a>
-                                    ) : (
-                                        '—'
-                                    )
+                                    ) : '—'
                                 }
                             />
                             <DetailField
                                 label="Phone"
-                                value={
-                                    customer.phone ? (
-                                        <a href={`tel:${customer.phone}`} className="text-primary-600 hover:underline">
-                                            {customer.phone}
-                                        </a>
-                                    ) : (
-                                        '—'
-                                    )
-                                }
+                                value={customer.phone ? (
+                                    <a href={`tel:${customer.phone}`} className="text-primary-600 hover:underline">
+                                        {customer.phone}
+                                    </a>
+                                ) : '—'}
                             />
                             <DetailField label="Customer ID" value={formatVal(customer.id ?? inquiry.customer_id)} />
                         </div>
                     </div>
 
-                    {/* Inquiry metadata */}
+                    {/* Inquiry Metadata */}
                     <div className="border-t border-slate-100 pt-10">
                         <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <Calendar size={16} />
-                            Inquiry metadata
+                            <Calendar size={16} /> Inquiry Metadata
                         </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             <DetailField label="Inquiry type" value={inquiryType} />
-                            <DetailField
-                                label="Priority"
-                                value={
-                                    <span
-                                        className={
-                                            priority.toLowerCase() === 'high'
-                                                ? 'text-red-500 font-black uppercase'
-                                                : 'font-bold capitalize'
-                                        }
-                                    >
-                                        {priority}
-                                    </span>
-                                }
-                            />
+                            <DetailField label="Priority" value={
+                                <span className={priority.toLowerCase() === 'high' ? 'text-red-500 font-black uppercase' : 'font-bold capitalize'}>
+                                    {priority}
+                                </span>
+                            } />
                             <DetailField label="Partner ID" value={formatVal(inquiry.partner_id)} />
                             <DetailField label="Created" value={formatDateTime(inquiry.created_at)} />
                             <DetailField label="Last updated" value={formatDateTime(inquiry.updated_at)} />
                         </div>
                     </div>
 
-                    {/* Inquiry information (summary) */}
+                    {/* Inquiry Information (Summary) */}
                     <div className="border-t border-slate-100 pt-10">
                         <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-6">
-                            <Info size={22} className="text-primary-500" />
-                            Inquiry information
+                            <Info size={22} className="text-primary-500" /> Inquiry Information
                         </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Service type</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Service Type</p>
                                 <p className="text-slate-900 font-bold text-lg capitalize">{inquiryType}</p>
                             </div>
-                            <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                            <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Priority</p>
-                                <p
-                                    className={`font-black text-lg uppercase ${priority.toLowerCase() === 'high' ? 'text-red-500' : 'text-slate-900'
-                                        }`}
-                                >
+                                <p className={`font-black text-lg uppercase ${priority.toLowerCase() === 'high' ? 'text-red-500' : 'text-slate-900'}`}>
                                     {priority}
                                 </p>
                             </div>
                         </div>
-                        <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Issue / notes</p>
-                            <p className="text-slate-700 italic leading-relaxed">&quot;{issueText}&quot;</p>
+                        <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Issue / Notes</p>
+                            <p className="text-slate-700 italic leading-relaxed">"{issueText}"</p>
                         </div>
                     </div>
 
-                    {/* Line item — product & commercial */}
+                    {/* Line Item — Product & Pricing */}
                     <div className="border-t border-slate-100 pt-10">
                         <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <Package size={16} />
-                            Line item — product &amp; pricing
+                            <Package size={16} /> Line Item — Product & Pricing
                         </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <DetailField label="Product type" value={formatVal(item.type)} />
                             <DetailField label="Brand" value={formatVal(item.brand)} />
                             <DetailField label="Capacity" value={formatVal(item.capacity)} />
                             <DetailField label="Unit" value={formatVal(item.unit)} />
                             <DetailField label="Quantity" value={formatVal(item.quantity)} />
-                            <DetailField
-                                label="Unit price"
-                                value={item.price != null ? `SAR ${item.price}` : '—'}
-                            />
+                            <DetailField label="Unit price" value={item.price != null ? `SAR ${item.price}` : '—'} />
                             <DetailField label="Condition" value={formatVal(item.condition)} />
                             <DetailField label="Item status" value={formatVal(item.status)} />
                             <DetailField label="Seller" value={formatVal(item.seller)} />
@@ -508,23 +480,22 @@ const InquiryItemDetailPage = () => {
                         </div>
                     </div>
 
-                    {/* Identification & systems */}
+                    {/* Identification & Systems */}
                     <div className="border-t border-slate-100 pt-10">
-                        <div className="flex items-center justify-between gap-2 mb-4">
+                        <div className="flex items-center justify-between gap-4 mb-4">
                             <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                <Hash size={16} />
-                                Identification &amp; systems
+                                <Hash size={16} /> Identification & Systems
                             </h2>
                             <button
                                 type="button"
                                 onClick={() => setIsNewUnitModalOpen(true)}
-                                className="p-2 bg-slate-900 hover:bg-primary-500 text-white rounded-xl shadow-lg transition-all active:scale-95 group"
+                                className="p-3 bg-slate-900 hover:bg-primary-500 text-white rounded-2xl shadow-lg transition-all active:scale-95"
                                 title="Edit identification details"
                             >
-                                <Edit2 size={14} className="group-hover:rotate-12 transition-transform" />
+                                <Edit2 size={16} />
                             </button>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <DetailField label="Serial no." value={formatVal(item.serial_no)} />
                             <DetailField label="Catalog no." value={formatVal(item.catalog_no)} />
                             <DetailField label="Sub-unit" value={formatVal(item.is_sub_unit)} />
@@ -540,7 +511,7 @@ const InquiryItemDetailPage = () => {
                             <Calendar size={16} />
                             Dates
                         </h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <DetailField label="Install date" value={formatDateTime(item.install_date)} />
                             <DetailField label="Expiry date" value={formatDateTime(item.expiry_date)} />
                             {item.status === "Refilled" && (
@@ -551,28 +522,24 @@ const InquiryItemDetailPage = () => {
                         </div>
                     </div>
 
-                    {/* Media */}
+                    {/* Media & Attachments */}
                     <div className="border-t border-slate-100 pt-10">
                         <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <ImageIcon size={16} />
-                            Media &amp; attachments
+                            <ImageIcon size={16} /> Media & Attachments
                         </h2>
-                        <div className="flex flex-wrap gap-6 p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                            <MediaLink href={item.certificate_photo} label="Certificate photo" icon={ImageIcon} />
-                            <MediaLink href={item.extinguisher_photo} label="Extinguisher photo" icon={ImageIcon} />
-                            <MediaLink href={item.maintenance_unit_photo_url} label="Maintenance unit photo" icon={ImageIcon} />
-                            <MediaLink href={item.maintenance_voice_url} label="Voice note" icon={Mic} isAudio={true} />
-                            {!item.certificate_photo &&
-                                !item.extinguisher_photo &&
-                                !item.maintenance_unit_photo_url &&
-                                !item.maintenance_voice_url && (
-                                    <p className="text-sm text-slate-500 italic">No media uploaded for this line item.</p>
+                        <div className="flex flex-wrap gap-4 p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                            <MediaLink href={item.certificate_photo} label="Certificate" icon={ImageIcon} />
+                            <MediaLink href={item.extinguisher_photo} label="Extinguisher" icon={ImageIcon} />
+                            <MediaLink href={item.maintenance_unit_photo_url} label="Maintenance Photo" icon={ImageIcon} />
+                            <MediaLink href={item.maintenance_voice_url} label="Voice Note" icon={Mic} isAudio={true} />
+                            {!item.certificate_photo && !item.extinguisher_photo &&
+                                !item.maintenance_unit_photo_url && !item.maintenance_voice_url && (
+                                    <p className="text-sm text-slate-500 italic py-4">No media uploaded for this line item.</p>
                                 )}
                         </div>
                     </div>
 
-
-
+                    {/* Technical Documentation (Maintenance) */}
                     {isMaintenanceInquiry && isInquiryAccepted && (
                         <div className="border-t border-slate-100 pt-10">
                             <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -740,14 +707,16 @@ const InquiryItemDetailPage = () => {
                 </div>
 
                 {isInquiryPending && (
-                    <PartnerActionCard
-                        onAccept={() => handleStatusUpdate('accepted')}
-                        onReject={() => handleStatusUpdate('rejected')}
-                        disabled={actionLoading}
-                    />
+                    <div className="lg:sticky lg:top-8 self-start w-full lg:w-[360px]">
+                        <PartnerActionCard
+                            onAccept={() => handleStatusUpdate('accepted')}
+                            onReject={() => handleStatusUpdate('rejected')}
+                            disabled={actionLoading}
+                        />
+                    </div>
                 )}
                 {isMaintenanceInquiry && isInquiryAccepted && (
-                    <div className="flex flex-col gap-6 w-full lg:w-96">
+                    <div className="lg:sticky lg:top-8 self-start flex flex-col gap-6 w-full lg:w-[360px]">
                         <PartnerPostAcceptCard
                             inquiryId={inquiryId}
                             itemId={itemId}
@@ -757,19 +726,19 @@ const InquiryItemDetailPage = () => {
                             approvalStatus={inquiry.approval_status}
                             scheduledDate={inquiry.scheduled_date}
                         />
-                        <InquiryChatBox 
-                            inquiryId={inquiryId} 
-                            recipientId={inquiry.customer_id} 
+                        <InquiryChatBox
+                            inquiryId={inquiryId}
+                            recipientId={inquiry.customer_id}
                             recipientRole="Customer"
                             title="Chat with Customer"
                         />
                     </div>
                 )}
                 {!isMaintenanceInquiry && isInquiryAccepted && (
-                    <div className="flex flex-col gap-6 w-full lg:w-96">
-                        <InquiryChatBox 
-                            inquiryId={inquiryId} 
-                            recipientId={inquiry.customer_id} 
+                    <div className="lg:sticky lg:top-8 self-start w-full lg:w-[360px]">
+                        <InquiryChatBox
+                            inquiryId={inquiryId}
+                            recipientId={inquiry.customer_id}
                             recipientRole="Customer"
                             title="Chat with Customer"
                         />

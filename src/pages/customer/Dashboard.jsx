@@ -13,7 +13,8 @@ import {
     ClipboardList,
     FileCheck,
     Loader2,
-    RefreshCw
+    RefreshCw,
+    FileText
 } from 'lucide-react';
 import PageLoader from '../../components/PageLoader';
 import { fetchCustomerInquiries, fetchCustomerQuotations, approveQuotation } from '../../api/customerPortal';
@@ -322,11 +323,16 @@ const CustomerDashboard = () => {
                                 const internalRef =
                                     inq.internal_reference_number || inq.internal_ref || '—';
 
+                                // Find associated maintenance quotation
+                                const associatedQuote = maintenanceQuotations.find(
+                                    (mq) => mq.inquiry_id === inq.id
+                                );
+
                                 const ext = Array.isArray(inq.inquiry_extensions)
                                     ? inq.inquiry_extensions
                                     : Array.isArray(inq.extensions)
-                                      ? inq.extensions
-                                      : [];
+                                        ? inq.extensions
+                                        : [];
                                 const items = Array.isArray(inq.inquiry_items) ? inq.inquiry_items : [];
                                 const services = Array.isArray(inq.inquiry_item_services) ? inq.inquiry_item_services : [];
 
@@ -373,11 +379,10 @@ const CustomerDashboard = () => {
                                                                 }) : 'Not set'}
                                                             </span>
                                                             {inq.approval_status && (
-                                                                <span className={`px-2 py-0.5 rounded-md font-bold uppercase tracking-wider text-[10px] ${
-                                                                    inq.approval_status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                                                                    inq.approval_status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                                                    'bg-amber-100 text-amber-700'
-                                                                }`}>
+                                                                <span className={`px-2 py-0.5 rounded-md font-bold uppercase tracking-wider text-[10px] ${inq.approval_status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                                                                        inq.approval_status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                                                            'bg-amber-100 text-amber-700'
+                                                                    }`}>
                                                                     {inq.approval_status}
                                                                 </span>
                                                             )}
@@ -509,9 +514,9 @@ const CustomerDashboard = () => {
                                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
                                                             Messages / Support
                                                         </p>
-                                                        <InquiryChatBox 
-                                                            inquiryId={inq.id} 
-                                                            recipientId={inq.partner_id} 
+                                                        <InquiryChatBox
+                                                            inquiryId={inq.id}
+                                                            recipientId={inq.partner_id}
                                                             recipientRole="Partner"
                                                             title={`Chat with Partner regarding ${inq.inquiry_no || 'Inquiry'}`}
                                                         />
@@ -577,7 +582,7 @@ const CustomerDashboard = () => {
                                     </div>
                                 );
                             })}
-                            
+
                             {/* Maintenance Quotations */}
                             {maintenanceQuotations.map((mq) => (
                                 <div
@@ -594,8 +599,8 @@ const CustomerDashboard = () => {
                                                 <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-black uppercase rounded-md tracking-wider">New</span>
                                             </div>
                                             <p className="text-xs text-slate-500 mt-1">
-                                               For Inquiry: <span className="font-bold text-slate-700">#{mq.inquiry_id?.slice(0, 8)}…</span> · 
-                                               Estimated Cost: <span className="font-bold text-emerald-600">SAR {mq.estimated_cost}</span>
+                                                For Inquiry: <span className="font-bold text-slate-700">#{mq.inquiry_id?.slice(0, 8)}…</span> ·
+                                                Estimated Cost: <span className="font-bold text-emerald-600">SAR {mq.estimated_cost}</span>
                                             </p>
                                             <p className="text-[10px] text-slate-400 mt-1">Submitted: {new Date(mq.created_at).toLocaleDateString()}</p>
                                         </div>
@@ -733,16 +738,15 @@ const CustomerDashboard = () => {
                                         <p className="text-xs text-slate-500">
                                             {service.scheduled_date
                                                 ? new Date(service.scheduled_date).toLocaleDateString(undefined, {
-                                                      month: 'long',
-                                                      year: 'numeric'
-                                                  })
+                                                    month: 'long',
+                                                    year: 'numeric'
+                                                })
                                                 : 'Pending'}
                                         </p>
                                     </div>
                                     <span
-                                        className={`text-xs px-2 py-1 rounded-lg font-bold ${
-                                            service.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                                        }`}
+                                        className={`text-xs px-2 py-1 rounded-lg font-bold ${service.status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                            }`}
                                     >
                                         {service.status || 'Pending'}
                                     </span>

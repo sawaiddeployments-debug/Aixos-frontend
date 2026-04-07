@@ -67,40 +67,17 @@ export const sendDirectMessage = async (senderId, receiverId, inquiryId, content
     console.groupEnd();
 
     try {
-        // 1. Send the message via API (Backend expects 'message' instead of 'content')
+        // 1. Send the message via API (Backend now handles notification creation)
         const response = await client.post('/messages', {
             sender_id: senderId,
             receiver_id: receiverId,
+            receiver_role: senderRole === 'partner' ? 'customer' : 'partner',
             inquiry_id: inquiryId,
             extinguisher_id: extinguisherId,
             message: content
         });
 
-        console.log('✅ API RESPONSE:', response.data);
-
-        // 2. Trigger notification in Supabase
-        if (response.data?.success || response.data?.data) {
-            try {
-                console.log('🔔 TRIGGERING NOTIFICATION FOR:', receiverId);
-                const { data: notifData, error: notifErr } = await supabase.from('notifications').insert({
-                    sender_id: senderId,
-                    sender_role: senderRole,
-                    recipient_id: String(receiverId), // Ensure it's text for UUIDs/int4 logic
-                    recipient_role: senderRole === 'partner' ? 'customer' : 'partner',
-                    inquiry_id: inquiryId,
-                    message: `New message received from ${senderRole.charAt(0).toUpperCase() + senderRole.slice(1)}`,
-                    is_read: false
-                });
-                
-                if (notifErr) {
-                    console.error('⚠️ NOTIFICATION INSERT ERROR:', notifErr);
-                } else {
-                    console.log('✅ NOTIFICATION TRIGGERED SUCCESSFULLY');
-                }
-            } catch (notifErr) {
-                console.error('❌ FAILED TO TRIGGER NOTIFICATION:', notifErr);
-            }
-        }
+        console.log("Messages API response:", response.data);
 
         return response.data?.data;
     } catch (error) {

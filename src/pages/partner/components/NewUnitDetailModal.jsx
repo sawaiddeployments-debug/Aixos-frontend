@@ -19,28 +19,34 @@ const NewUnitDetailModal = ({ isOpen, onClose, inquiry, onUpdate }) => {
     const [availableCatalogs, setAvailableCatalogs] = useState([]);
 
     const estimatedPrice = pricePerUnit * confirmedQuantity;
+    const requestedQuantity = inquiry?.quantity || 0;
+    const isRemarksRequired = confirmedQuantity < requestedQuantity;
 
     useEffect(() => {
         if (inquiry && isOpen) {
             const preselected = inquiry.selectedItem || {};
             const baseProductName = preselected.type || preselected.system || '';
             const options = Array.isArray(preselected.catalog_options) ? preselected.catalog_options : [];
+
             const normalizedCatalogs = options
                 .filter((option) => option?.catalog_no)
                 .map((option) => ({ ...option, productName: option.productName || baseProductName }));
-            const fallbackCatalogNo =
-                preselected.catalog_no ||
+
+            const fallbackCatalogNo = preselected.catalog_no ||
                 preselected.catalog_number ||
                 preselected.catalogNo ||
                 (preselected.id ? `ITEM-${preselected.id}` : '');
+
             const fallbackCatalogs = fallbackCatalogNo
                 ? [{ catalog_no: fallbackCatalogNo, productName: baseProductName }]
                 : [];
-            const products = [baseProductName, ...normalizedCatalogs.map((item) => item.productName)]
+
+            const products = [baseProductName, ...normalizedCatalogs.map(item => item.productName)]
                 .filter(Boolean)
                 .filter((item, idx, arr) => arr.indexOf(item) === idx);
 
             const catalogsToUse = normalizedCatalogs.length > 0 ? normalizedCatalogs : fallbackCatalogs;
+
             setAvailableProducts(products);
             setAllCatalogs(catalogsToUse);
             setAvailableCatalogs(catalogsToUse);
@@ -59,7 +65,8 @@ const NewUnitDetailModal = ({ isOpen, onClose, inquiry, onUpdate }) => {
         }
 
         const currentItem = inquiry?.selectedItem || {};
-        const selectedCatalog = availableCatalogs.find((item) => item.catalog_no === selectedCatalogNo);
+        const selectedCatalog = availableCatalogs.find(item => item.catalog_no === selectedCatalogNo);
+
         setProductInfo({
             productName: selectedProductName || currentItem.type || currentItem.system || 'Fire Equipment',
             catalog_no: selectedCatalogNo,
@@ -75,9 +82,6 @@ const NewUnitDetailModal = ({ isOpen, onClose, inquiry, onUpdate }) => {
     }, [selectedCatalogNo, selectedProductName, availableCatalogs, inquiry]);
 
     if (!isOpen) return null;
-
-    const requestedQuantity = inquiry?.quantity || 0;
-    const isRemarksRequired = confirmedQuantity < requestedQuantity;
 
     const handleConfirm = async () => {
         if (!selectedCatalogNo) {
@@ -102,15 +106,17 @@ const NewUnitDetailModal = ({ isOpen, onClose, inquiry, onUpdate }) => {
                 type: productInfo.type !== '--' ? productInfo.type : undefined,
                 capacity: productInfo.capacity !== '--' ? productInfo.capacity : undefined,
             });
+
             setIsSuccess(true);
             toast.success('Item updated successfully');
+
             setTimeout(() => {
                 setIsSuccess(false);
                 onClose();
-                onUpdate && onUpdate(); // Signal parent to refresh
-            }, 1000);
+                onUpdate && onUpdate();
+            }, 1200);
         } catch (err) {
-            console.error('Update confirm error:', err);
+            console.error('Update error:', err);
             toast.error('Failed to update item details');
         } finally {
             setIsLoading(false);
@@ -119,167 +125,156 @@ const NewUnitDetailModal = ({ isOpen, onClose, inquiry, onUpdate }) => {
 
     return (
         <>
-            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-                <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
+                <div className="bg-white w-full max-w-lg md:max-w-2xl rounded-3xl shadow-2xl overflow-hidden max-h-[94vh] flex flex-col">
+
                     {/* Header */}
-                    <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-50">
+                    <div className="p-6 border-b flex items-center justify-between bg-white sticky top-0 z-10">
                         <div>
                             <h3 className="text-2xl font-black text-slate-900 tracking-tight">
-                                Unit <span className="text-primary-500">Details.</span>
+                                Unit <span className="text-primary-500">Details</span>
                             </h3>
-                            <div className="flex items-center gap-4 mt-1">
-                                <p className="text-slate-500 text-sm font-medium">
-                                    {inquiry?.customers?.business_name || inquiry?.business_name || 'Generic Client'} — {inquiry?.inquiry_no}
-                                </p>
-                            </div>
+                            <p className="text-sm text-slate-500 mt-1 line-clamp-1">
+                                {inquiry?.customers?.business_name || inquiry?.business_name || 'Client'} — {inquiry?.inquiry_no}
+                            </p>
                         </div>
-                        <button onClick={onClose} className="p-2 text-slate-400 hover:text-primary-500 hover:bg-primary-50 rounded-2xl transition-all">
-                            <X size={24} />
+                        <button
+                            onClick={onClose}
+                            className="p-3 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-2xl transition-all"
+                        >
+                            <X size={26} />
                         </button>
                     </div>
 
-                    <div className="p-8 max-h-[80vh] overflow-y-auto">
+                    {/* Scrollable Content */}
+                    <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
                         {!isSuccess ? (
-                            <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-300">
-                                {/* Selection Row */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-3">
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">
-                                            Select Product
-                                        </label>
-                                        <div className="relative group">
+                            <div className="space-y-8">
+                                {/* Product & Catalog Selection */}
+                                <div className="grid grid-cols-1 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Select Product</label>
+                                        <div className="relative">
                                             <select
                                                 value={selectedProductName}
                                                 onChange={(e) => {
                                                     setSelectedProductName(e.target.value);
                                                     setSelectedCatalogNo('');
-                                                    const filtered = allCatalogs.filter((item) => (item.productName || e.target.value) === e.target.value);
-                                                    if (filtered.length > 0) {
-                                                        setAvailableCatalogs(filtered);
-                                                    }
+                                                    const filtered = allCatalogs.filter(item =>
+                                                        (item.productName || e.target.value) === e.target.value
+                                                    );
+                                                    setAvailableCatalogs(filtered.length > 0 ? filtered : allCatalogs);
                                                 }}
-                                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-6 pr-12 appearance-none outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 font-bold text-slate-900 transition-all cursor-pointer"
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-5 text-sm font-medium focus:border-primary-500 outline-none"
                                             >
                                                 <option value="">Choose Product</option>
-                                                {availableProducts.map((name) => (
+                                                {availableProducts.map(name => (
                                                     <option key={name} value={name}>{name}</option>
                                                 ))}
                                             </select>
-                                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-hover:text-primary-500 transition-colors" size={20} />
                                         </div>
                                     </div>
 
-                                    <div className="space-y-3">
-                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">
-                                            Select Catalog Number
-                                        </label>
-                                        <div className="relative group">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Select Catalog Number</label>
+                                        <div className="relative">
                                             <select
                                                 value={selectedCatalogNo}
                                                 onChange={(e) => setSelectedCatalogNo(e.target.value)}
                                                 disabled={!selectedProductName}
-                                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-4 pl-6 pr-12 appearance-none outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 font-bold text-slate-900 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-5 text-sm font-medium focus:border-primary-500 outline-none disabled:opacity-50"
                                             >
-                                                <option value="">{selectedProductName ? 'Choose Catalog No' : 'Select Product First'}</option>
-                                                {availableCatalogs.map((item) => (
+                                                <option value="">
+                                                    {selectedProductName ? 'Choose Catalog No' : 'Select Product First'}
+                                                </option>
+                                                {availableCatalogs.map(item => (
                                                     <option key={item.catalog_no} value={item.catalog_no}>
                                                         {item.catalog_no}
                                                     </option>
                                                 ))}
                                             </select>
-                                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none group-hover:text-primary-500 transition-colors" size={20} />
                                         </div>
                                     </div>
                                 </div>
 
-                                {productInfo ? (
-                                    <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                                        {/* Product Overview Card */}
-                                        <div className="flex items-center gap-4 bg-slate-900 p-6 rounded-[2rem] text-white shadow-xl">
-                                            <div className="p-3 bg-white/10 rounded-2xl">
-                                                <Package size={24} className="text-primary-400" />
+                                {/* Product Info & Pricing */}
+                                {productInfo && (
+                                    <div className="space-y-8">
+                                        {/* Product Overview */}
+                                        <div className="bg-slate-900 p-6 rounded-3xl text-white flex flex-col sm:flex-row items-start sm:items-center gap-5">
+                                            <div className="p-4 bg-white/10 rounded-2xl shrink-0">
+                                                <Package size={28} className="text-primary-400" />
                                             </div>
-                                            <div className="flex-1">
-                                                <p className="text-[10px] font-black text-white uppercase tracking-widest mb-0.5">Specifications Summary</p>
-                                                <h4 className="text-xl font-black text-white uppercase tracking-tight">{productInfo.productName}</h4>
-                                                <div className="flex items-center gap-3 mt-1 text-[10px] font-bold text-slate-400">
-                                                    <span className="flex items-center gap-1"><Tag size={10} /> {productInfo.catalog_no}</span>
-                                                    <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-black uppercase tracking-widest text-slate-300">Selected Product</p>
+                                                <h4 className="text-xl text-white tracking-tight mt-1 break-words">
+                                                    {productInfo.productName}
+                                                </h4>
+                                                <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
+                                                    <span>Catalog: {productInfo.catalog_no}</span>
+                                                    <span>•</span>
                                                     <span>{productInfo.capacity}</span>
-                                                    <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
-                                                    <span>{productInfo.type}</span>
                                                 </div>
                                             </div>
                                             <button
                                                 onClick={() => setIsProductModalOpen(true)}
-                                                className="p-3 hover:bg-white/10 rounded-2xl transition-all text-slate-400 hover:text-white"
-                                                title="View Full Specifications"
+                                                className="p-3 hover:bg-white/10 rounded-2xl transition-all shrink-0"
                                             >
-                                                <Maximize2 size={20} />
+                                                <Maximize2 size={22} />
                                             </button>
                                         </div>
 
-                                        {/* Pricing & Quantity Section */}
-                                        <div className="bg-white border-2 border-slate-100 rounded-[2.5rem] p-8 space-y-8 shadow-sm">
+                                        {/* Pricing & Quantity */}
+                                        <div className="bg-white border border-slate-100 rounded-3xl p-6 md:p-8 space-y-8">
                                             <div className="flex items-center justify-between">
-                                                <h5 className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">Partner Response</h5>
-                                                <span className="px-3 py-1 bg-primary-50 text-primary-600 text-[10px] font-black rounded-full uppercase tracking-widest">
+                                                <h5 className="font-black text-slate-900 uppercase tracking-widest text-sm">Partner Response</h5>
+                                                <span className="px-4 py-1 bg-primary-50 text-primary-600 text-xs font-black rounded-2xl">
                                                     Requested: {requestedQuantity}
                                                 </span>
                                             </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                                <div className="space-y-3">
-                                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                                                        Price per Unit (SAR)
-                                                    </label>
-                                                    <div className="relative group">
-                                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[10px] group-focus-within:text-primary-500 transition-colors uppercase">SAR</div>
-                                                        <input
-                                                            type="number"
-                                                            min={0}
-                                                            value={pricePerUnit}
-                                                            onChange={(e) => setPricePerUnit(parseFloat(e.target.value) || 0)}
-                                                            className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl py-5 pl-10 pr-6 outline-none focus:bg-white focus:border-primary-500 font-black text-2xl text-slate-900 transition-all"
-                                                            placeholder="0.00"
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-3">
-                                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                                                        Quantity
-                                                    </label>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Price per Unit (SAR)</label>
                                                     <input
                                                         type="number"
-                                                        min={0}
-                                                        value={confirmedQuantity}
-                                                        onChange={(e) => setConfirmedQuantity(parseInt(e.target.value) || 0)}
-                                                        className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl py-5 px-6 outline-none focus:bg-white focus:border-primary-500 font-black text-2xl text-slate-900 transition-all"
+                                                        step="0.01"
+                                                        value={pricePerUnit}
+                                                        onChange={(e) => setPricePerUnit(parseFloat(e.target.value) || 0)}
+                                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-5 text-2xl font-black focus:border-primary-500 outline-none"
+                                                        placeholder="0.00"
                                                     />
                                                 </div>
 
-                                                <div className="space-y-3">
-                                                    <label className="text-xs font-black text-primary-500 uppercase tracking-widest">
-                                                        Estimated Total
-                                                    </label>
-                                                    <div className="w-full bg-slate-50 border-2 border-slate-50 rounded-2xl py-5 px-6 font-black text-2xl text-slate-400 cursor-not-allowed flex items-center shadow-inner">
-                                                        <span className="mr-2 text-xs">SAR</span>
-                                                        {estimatedPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Confirmed Quantity</label>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        value={confirmedQuantity}
+                                                        onChange={(e) => setConfirmedQuantity(parseInt(e.target.value) || 0)}
+                                                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-5 text-2xl font-black focus:border-primary-500 outline-none"
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <label className="text-xs font-black text-primary-500 uppercase tracking-widest">Estimated Total</label>
+                                                    <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-5 text-2xl font-black text-slate-400">
+                                                        SAR {estimatedPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {isRemarksRequired && (
-                                                <div className="space-y-3 pt-4 border-t border-slate-50 animate-in slide-in-from-top-4">
-                                                    <label className="text-xs font-black text-rose-500 uppercase tracking-widest flex items-center gap-2">
-                                                        <AlertCircle size={14} /> Remarks for lower quantity
+                                                <div className="pt-4 border-t">
+                                                    <label className="text-xs font-black text-rose-500 uppercase tracking-widest flex items-center gap-2 mb-2">
+                                                        <AlertCircle size={16} /> Remarks Required
                                                     </label>
                                                     <textarea
                                                         value={remarks}
                                                         onChange={(e) => setRemarks(e.target.value)}
-                                                        placeholder="Provide a reason..."
-                                                        className="w-full bg-rose-50/30 border border-rose-100 rounded-2xl py-4 px-6 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 font-medium text-slate-900 transition-all min-h-[100px]"
+                                                        placeholder="Reason for confirming lower quantity..."
+                                                        className="w-full h-28 bg-rose-50 border border-rose-100 rounded-2xl p-4 text-sm focus:border-rose-300 outline-none"
                                                     />
                                                 </div>
                                             )}
@@ -287,29 +282,34 @@ const NewUnitDetailModal = ({ isOpen, onClose, inquiry, onUpdate }) => {
 
                                         <button
                                             onClick={handleConfirm}
-                                            disabled={isLoading}
-                                            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-5 rounded-[1.5rem] shadow-xl transition-all active:scale-[0.98] text-sm uppercase tracking-[0.2em] mt-4 flex items-center justify-center gap-3 disabled:opacity-50"
+                                            disabled={isLoading || !selectedCatalogNo}
+                                            className="w-full py-5 bg-slate-900 hover:bg-black text-white font-black rounded-3xl text-sm uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-3"
                                         >
-                                            {isLoading ? <Loader2 className="animate-spin" size={20} /> : 'Confirm Availability & Update'}
+                                            {isLoading ? (
+                                                <Loader2 className="animate-spin" size={22} />
+                                            ) : (
+                                                'Confirm Availability & Update Item'
+                                            )}
                                         </button>
                                     </div>
-                                ) : (
-                                    <div className="py-20 text-center bg-slate-50/50 rounded-[2.5rem] border-2 border-dashed border-slate-200">
-                                        <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-soft">
-                                            <Search size={32} className="text-slate-200" />
-                                        </div>
-                                        <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Awaiting product & catalog selection...</p>
+                                )}
+
+                                {!productInfo && (
+                                    <div className="py-20 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                                        <Search size={48} className="mx-auto text-slate-300 mb-4" />
+                                        <p className="text-slate-400 font-medium">Please select a product and catalog number</p>
                                     </div>
                                 )}
                             </div>
                         ) : (
-                            <div className="py-20 text-center animate-in zoom-in-95 duration-500">
-                                <div className="w-24 h-24 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
-                                    <CheckCircle size={48} />
+                            /* Success State */
+                            <div className="py-20 text-center">
+                                <div className="w-24 h-24 bg-emerald-100 mx-auto rounded-full flex items-center justify-center mb-8">
+                                    <CheckCircle size={56} className="text-emerald-600" />
                                 </div>
                                 <h4 className="text-3xl font-black text-slate-900 tracking-tight">Update Successful!</h4>
-                                <p className="text-slate-500 font-medium max-w-xs mx-auto mt-4">
-                                    Availability confirmed. The inquiry status has been updated across the system.
+                                <p className="text-slate-500 mt-3 max-w-xs mx-auto">
+                                    The item has been successfully updated with the selected catalog and quantity.
                                 </p>
                             </div>
                         )}

@@ -10,11 +10,13 @@ import {
   Search, Check, AlertTriangle, ArrowRight, UserPlus, MapPin, Camera, Image, Mic, Square,
   EyeOff,
   Eye,
-  Pencil
+  Pencil,
+  History
 } from 'lucide-react';
 import bcrypt from 'bcryptjs';
 import { useRef } from 'react';
 import CameraCapture from '../../components/CameraCapture';
+import CustomerHistoryModal from '../../components/CustomerHistoryModal';
 
 const getDefaultUnit = (material) => {
   if (['Pipes', 'Hose Reels', 'Hydrants'].includes(material)) return 'Meter';
@@ -46,6 +48,7 @@ const VisitForm = () => {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [cameraTarget, setCameraTarget] = useState(null); // 'customer' or 'unit'
   const [activeUnitIndex, setActiveUnitIndex] = useState(null);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchPartners = async () => {
@@ -739,12 +742,12 @@ const VisitForm = () => {
         const { error: fallbackError } = await supabase.storage
           .from('visit-unit-photos')
           .upload(filePath, file);
-        
+
         if (fallbackError) {
           alert('Photo reference upload failed: ' + uploadError.message);
           return null;
         }
-        
+
         const { data: fallbackUrl } = supabase.storage
           .from('visit-unit-photos')
           .getPublicUrl(filePath);
@@ -1172,6 +1175,14 @@ const VisitForm = () => {
                       ) : (
                         <>Edit Customer</>
                       )}
+                    </button>
+
+                    <button
+                      onClick={() => setIsHistoryModalOpen(true)}
+                      className="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 bg-slate-900 text-white hover:bg-slate-800 shadow-md shadow-slate-900/10"
+                    >
+                      <History size={14} />
+                      View History
                     </button>
 
                     <button
@@ -2452,7 +2463,7 @@ const VisitForm = () => {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Follow-up Date</label>
                 <input type="date" name="followUpDate" value={formData.followUpDate} onChange={handleInputChange} className="input-field" />
               </div>
-              <div>
+              {/* <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Performed By</label>
                 <select
                   name="performedBy"
@@ -2470,7 +2481,7 @@ const VisitForm = () => {
                     </>
                   )}
                 </select>
-              </div>
+              </div> */}
             </div>
 
             <div className="flex justify-between mt-8 pt-6 border-t border-slate-100">
@@ -2500,6 +2511,13 @@ const VisitForm = () => {
             ));
           }
         }}
+      />
+      {/* Customer History Modal */}
+      <CustomerHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        customerId={formData.customerId}
+        customerName={formData.businessName}
       />
     </div>
   );

@@ -99,7 +99,10 @@ const NotificationBell = ({ onOpenChat }) => {
                          message: n.message,
                          type: 'message',
                          timestamp: n.created_at,
-                         isRead: n.is_read
+                         isRead: n.is_read,
+                         relatedId: n.inquiry_id,
+                         senderId: n.sender_id,
+                         senderRole: n.sender_role
                     });
                 });
             }
@@ -117,13 +120,34 @@ const NotificationBell = ({ onOpenChat }) => {
     }, [user?.id]);
 
     useEffect(() => {
-        if (role === 'customer') {
+        if (role === 'customer' && user?.id) {
             loadCustomerNotifications();
+
+            // REAL-TIME: Subscribe to new notifications for this user
+            const channel = supabase
+                .channel(`user_notifications_${user.id}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'INSERT',
+                        table: 'notifications',
+                        filter: `recipient_id=eq.${user.id}`
+                    },
+                    (payload) => {
+                        console.log('🔔 REAL-TIME NOTIFICATION RECEIVED:', payload.new);
+                        loadCustomerNotifications();
+                    }
+                )
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(channel);
+            };
         } else {
             setNotifications([]);
             setUnreadCount(0);
         }
-    }, [role, loadCustomerNotifications]);
+    }, [role, user?.id, loadCustomerNotifications]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -159,7 +183,11 @@ const NotificationBell = ({ onOpenChat }) => {
     const handleNotificationClick = (notification) => {
         markAsRead(notification.id);
         if (notification.type === 'message' && onOpenChat) {
-            onOpenChat(notification.relatedId);
+            // Pass inquiryId and sender info for the new real-time chat
+            onOpenChat(notification.relatedId, {
+                senderId: notification.senderId,
+                senderRole: notification.senderRole
+            });
         }
         setIsOpen(false);
     };
