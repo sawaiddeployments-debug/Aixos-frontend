@@ -429,6 +429,7 @@ const VisitForm = () => {
 
         if (field === 'mode') {
           updated.price = 180; // default base
+          updated.validation_mode = 'new';
         }
 
         // Price calculation for BOTH New Unit AND Maintenance
@@ -464,7 +465,9 @@ const VisitForm = () => {
       newUnits: [],
       customMaterial: '',
       customFirefightingSystem: '',
-      validationPhoto: null
+      validationPhoto: null,
+      validation_mode: 'new',
+      validationFollowUpDate: ''
     }]);
   };
 
@@ -797,12 +800,14 @@ const VisitForm = () => {
   };
 
   const handleSubmit = async () => {
-    const partnerValues = extinguishers.map(ext => {
-      if (ext.partner === 'Other') {
-        return ext.customPartner?.trim() ? `custom:${ext.customPartner.trim().toLowerCase()}` : null;
-      }
-      return ext.partner || null;
-    }).filter(p => p !== null);
+    const partnerValues = extinguishers
+      .filter(ext => !(ext.mode === 'Validation' && ext.validation_mode === 'followup'))
+      .map(ext => {
+        if (ext.partner === 'Other') {
+          return ext.customPartner?.trim() ? `custom:${ext.customPartner.trim().toLowerCase()}` : null;
+        }
+        return ext.partner || null;
+      }).filter(p => p !== null);
 
     const uniquePartners = [...new Set(partnerValues)];
 
@@ -964,9 +969,13 @@ const VisitForm = () => {
               maintenance_unit_photo_url: photoUrl,
               extinguisher_photo: refPhotoUrl,
               expiry_date: item.expiryDate || null,
-              follow_up_date: formData.followUpDate || null,
-              performed_by: formData.performedBy || 'Agent',
+               performed_by: formData.performedBy || 'Agent',
               is_sub_unit: false,
+              validation_mode: item.mode === 'Validation' ? (item.validation_mode || 'new') : 'new',
+              follow_up_date: formData.followUpDate || null,
+              follow_up_date_validation: (item.mode === 'Validation' && item.validation_mode === 'followup') 
+                ? (item.validationFollowUpDate || null) 
+                : null
             });
           }
 
@@ -993,9 +1002,13 @@ const VisitForm = () => {
                 maintenance_unit_photo_url: photoUrl,
                 extinguisher_photo: refPhotoUrl,
                 expiry_date: item.expiryDate || null,
-                follow_up_date: formData.followUpDate || null,
                 performed_by: formData.performedBy || 'Agent',
                 is_sub_unit: true,
+                validation_mode: item.mode === 'Validation' ? (item.validation_mode || 'new') : 'new',
+                follow_up_date: formData.followUpDate || null,
+                follow_up_date_validation: (item.mode === 'Validation' && item.validation_mode === 'followup')
+                  ? (item.validationFollowUpDate || null)
+                  : null
               });
             });
           }
@@ -1014,7 +1027,18 @@ const VisitForm = () => {
           follow_up_date: formData.followUpDate || null
         };
 
+        // DEBUG LOGS (As requested)
+        console.log("Step 3 Date (General):", formData.followUpDate);
+        console.log("Follow-up Tab Dates (specific):", extinguishers.filter(e => e.mode === 'Validation').map(e => e.validationFollowUpDate));
+        console.log("Final Inquiry Payload:", inquiryData);
+        console.log("Final Items Payload (first item sample):", allItemsPayload[0] ? {
+          general_follow_up: allItemsPayload[0].follow_up_date,
+          validation_follow_up: allItemsPayload[0].follow_up_date_validation
+        } : "Empty");
+
         if (allItemsPayload.length > 0) {
+          // If no partner was selected (e.g. only follow-up validations), 
+          // we still need inquiry metadata but partner_id can be null or lead to separate logic
           await createInquiry(inquiryData, allItemsPayload);
         }
       }
@@ -1528,68 +1552,101 @@ const VisitForm = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-fade-in">
                   {ext.mode === 'Validation' && (
                     <>
-                      <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Partner</label>
-                        <select
-                          value={ext.partner || ''}
-                          onChange={(e) => handleExtinguisherChange(index, 'partner', e.target.value)}
-                          className="input-field py-2 text-sm"
-                          required
-                        >
-                          <option value="">{loadingPartners ? 'Loading...' : 'Select Partner'}</option>
-                          {partners.map(p => (
-                            <option key={p.id} value={p.id}>{p.business_name}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="md:col-span-3">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Photo Reference</label>
-                        <div className="relative group">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            disabled={ext.isLocked}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                handleExtinguisherChange(index, 'validationPhoto', file);
-                              }
-                            }}
-                            id={`validation-photo-${index}`}
-                            className="hidden"
-                          />
-                          <label
-                            htmlFor={`validation-photo-${index}`}
-                            className={`flex flex-col items-center justify-center w-full min-h-[120px] border-2 border-dashed rounded-2xl transition-all ${ext.isLocked
-                              ? 'bg-slate-50 border-slate-200 cursor-not-allowed'
-                              : 'bg-white border-slate-300 hover:border-primary-500 hover:bg-primary-50/10 cursor-pointer'
+                      <div className="md:col-span-4 mb-4">
+                        <div className="flex bg-slate-100 p-1 rounded-2xl w-fit">
+                          {['new', 'followup'].map((mode) => (
+                            <button
+                              key={mode}
+                              onClick={() => handleExtinguisherChange(index, 'validation_mode', mode)}
+                              className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${
+                                ext.validation_mode === mode
+                                  ? 'bg-white text-slate-900 shadow-sm'
+                                  : 'text-slate-500 hover:text-slate-700'
                               }`}
-                          >
-                            {ext.validationPhoto ? (
-                              <div className="relative w-full p-2 flex flex-col items-center animate-fade-in">
-                                <img
-                                  src={URL.createObjectURL(ext.validationPhoto)}
-                                  className="h-24 w-24 object-cover rounded-xl shadow-md border-2 border-white mb-2"
-                                  alt="Preview"
-                                />
-                                <div className="flex items-center gap-1.5 text-xs font-bold text-primary-600 uppercase tracking-wider">
-                                  <Camera size={14} />
-                                  Change Photo
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center p-6 text-center animate-fade-in">
-                                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                                  <Camera size={24} className="text-slate-400 group-hover:text-primary-500" />
-                                </div>
-                                <p className="text-sm font-bold text-slate-700 mb-1">Add Photo Reference</p>
-                                <p className="text-xs text-slate-500">Take a photo or upload from gallery</p>
-                              </div>
-                            )}
-                          </label>
+                            >
+                              {mode === 'new' ? 'New Validation' : 'Follow-up'}
+                            </button>
+                          ))}
                         </div>
                       </div>
+
+                      {ext.validation_mode === 'new' ? (
+                        <>
+                          <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">Partner</label>
+                            <select
+                              value={ext.partner || ''}
+                              onChange={(e) => handleExtinguisherChange(index, 'partner', e.target.value)}
+                              className="input-field py-2 text-sm"
+                              required
+                            >
+                              <option value="">{loadingPartners ? 'Loading...' : 'Select Partner'}</option>
+                              {partners.map(p => (
+                                <option key={p.id} value={p.id}>{p.business_name}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="md:col-span-3">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Photo Reference</label>
+                            <div className="relative group">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                disabled={ext.isLocked}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    handleExtinguisherChange(index, 'validationPhoto', file);
+                                  }
+                                }}
+                                id={`validation-photo-${index}`}
+                                className="hidden"
+                              />
+                              <label
+                                htmlFor={`validation-photo-${index}`}
+                                className={`flex flex-col items-center justify-center w-full min-h-[120px] border-2 border-dashed rounded-2xl transition-all ${ext.isLocked
+                                  ? 'bg-slate-50 border-slate-200 cursor-not-allowed'
+                                  : 'bg-white border-slate-300 hover:border-primary-500 hover:bg-primary-50/10 cursor-pointer'
+                                  }`}
+                              >
+                                {ext.validationPhoto ? (
+                                  <div className="relative w-full p-2 flex flex-col items-center animate-fade-in">
+                                    <img
+                                      src={URL.createObjectURL(ext.validationPhoto)}
+                                      className="h-24 w-24 object-cover rounded-xl shadow-md border-2 border-white mb-2"
+                                      alt="Preview"
+                                    />
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-primary-600 uppercase tracking-wider">
+                                      <Camera size={14} />
+                                      Change Photo
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center p-6 text-center animate-fade-in">
+                                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                      <Camera size={24} className="text-slate-400 group-hover:text-primary-500" />
+                                    </div>
+                                    <p className="text-sm font-bold text-slate-700 mb-1">Add Photo Reference</p>
+                                    <p className="text-xs text-slate-500">Take a photo or upload from gallery</p>
+                                  </div>
+                                )}
+                              </label>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="md:col-span-4">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Follow-up Date</label>
+                          <input
+                            type="date"
+                            required
+                            value={ext.validationFollowUpDate || ''}
+                            onChange={(e) => handleExtinguisherChange(index, 'validationFollowUpDate', e.target.value)}
+                            className="input-field py-3 text-sm"
+                          />
+                        </div>
+                      )}
                     </>
                   )}
 
