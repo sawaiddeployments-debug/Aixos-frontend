@@ -5,8 +5,7 @@ import { supabase } from '../../supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import PageLoader from '../../components/PageLoader';
 import QRCode from 'qrcode';
-import { createInquiry } from '../../api/partners';
-import { isApiUrlConfigured } from '../../api/client';
+import { createInquiryViaSupabase } from '../../api/inquirySupabase';
 import { getVisitSubmitErrorMessage } from '../../api/submitErrors';
 import {
   Plus, Trash, Save, ArrowLeft, Building, FireExtinguisher, FileText,
@@ -994,14 +993,6 @@ const VisitForm = () => {
       return;
     }
 
-    if (!isApiUrlConfigured) {
-      toast.error(
-        'API URL is not configured. Set VITE_API_URL in Vercel (your backend HTTPS origin), redeploy, then try again.',
-        { duration: 12000 }
-      );
-      return;
-    }
-
     if (formData.customerPhoto && formData.customerPhoto.size > MAX_VISIT_IMAGE_BYTES) {
       toast.error('Customer image must be less than 45KB');
       return;
@@ -1239,13 +1230,13 @@ const VisitForm = () => {
         if (allItemsPayload.length > 0) {
           // If no partner was selected (e.g. only follow-up validations), 
           // we still need inquiry metadata but partner_id can be null or lead to separate logic
-          await createInquiry(inquiryData, allItemsPayload);
+          await createInquiryViaSupabase(inquiryData, allItemsPayload);
         }
       }
       navigate('/agent/dashboard');
     } catch (error) {
       console.error(error);
-      toast.error(getVisitSubmitErrorMessage(error, isApiUrlConfigured), { duration: 10000 });
+      toast.error(getVisitSubmitErrorMessage(error, true), { duration: 10000 });
     } finally {
       setLoading(false);
     }

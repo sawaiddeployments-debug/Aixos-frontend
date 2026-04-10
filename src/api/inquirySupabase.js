@@ -1,5 +1,31 @@
 import { supabase } from '../supabaseClient';
 
+function throwReadableDbError(err, context) {
+  const detail = err?.message || err?.details || err?.hint || err?.code || 'Unknown database error';
+  const wrapped = new Error(`${context}: ${detail}`);
+  wrapped.original = err;
+  throw wrapped;
+}
+
+/** PostgREST / Postgres: unknown or missing column on insert */
+function isLikelyMissingColumnError(err) {
+  const text = `${err?.message || ''} ${err?.details || ''} ${err?.hint || ''}`;
+  return /column|schema cache|does not exist|PGRST204/i.test(text);
+}
+
+const CORE_INQUIRY_KEYS = new Set([
+  'inquiry_no',
+  'customer_id',
+  'type',
+  'priority',
+  'status',
+  'partner_id',
+  'agent_id',
+  'visit_id',
+  'performed_by',
+  'follow_up_date',
+]);
+
 /**
  * Insert inquiry + items directly into Supabase when the REST API is unreachable.
  * Keeps agent visit flow working on Vercel when VITE_API_URL / CORS / backend SSL fails.
@@ -41,15 +67,26 @@ export async function createInquiryViaSupabase(inquiryData, items) {
     }
   });
 
-  const { data: inq, error: inqErr } = await supabase
+  let inqRes = await supabase
     .from('inquiries')
     .insert([inquiryRow])
     .select('id')
     .single();
 
+  if (inqRes.error && isLikelyMissingColumnError(inqRes.error)) {
+    console.warn('[createInquiryViaSupabase] retrying inquiry insert without optional columns');
+    const slim = {};
+    Object.keys(inquiryRow).forEach((k) => {
+      if (CORE_INQUIRY_KEYS.has(k)) slim[k] = inquiryRow[k];
+    });
+    inqRes = await supabase.from('inquiries').insert([slim]).select('id').single();
+  }
+
+  const { data: inq, error: inqErr } = inqRes;
+
   if (inqErr) {
     console.error('[createInquiryViaSupabase] inquiries insert', inqErr);
-    throw inqErr;
+    throwReadableDbError(inqErr, 'Could not save inquiry');
   }
 
   const inquiryId = inq.id;
@@ -89,7 +126,7 @@ export async function createInquiryViaSupabase(inquiryData, items) {
     const { error: itemsErr } = await supabase.from('inquiry_items').insert(itemRows);
     if (itemsErr) {
       console.error('[createInquiryViaSupabase] inquiry_items insert', itemsErr);
-      throw itemsErr;
+      throwReadableDbError(itemsErr, 'Could not save inquiry line items');
     }
   }
 
