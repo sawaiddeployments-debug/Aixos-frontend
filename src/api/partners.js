@@ -124,7 +124,24 @@ export const submitSiteVisit = async (formData) => {
         throw error;
     }
 };
+export const getAllPartners = async () => {
+    try {
+        const response = await client.get('/partners');
+        return extractApiData(response, []);
+    } catch (error) {
+        console.error('Error fetching partners:', error);
+        throw error;
+    }
+};
+
 export const createInquiry = async (inquiryData, items) => {
+    const inquiryType = String(inquiryData?.type || '').trim().toLowerCase();
+    const requiresPartner = inquiryType === 'validation' || inquiryType === 'refill' || inquiryType === 'refilled';
+    if (requiresPartner && !inquiryData?.partner_id) {
+        const err = new Error('Partner is required for this inquiry type');
+        err.status = 400;
+        throw err;
+    }
     try {
         const response = await client.post('/inquiries', { inquiryData, items });
         return extractApiData(response, null);

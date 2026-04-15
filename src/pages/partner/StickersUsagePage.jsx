@@ -83,7 +83,7 @@ const StickersUsagePage = () => {
           </div>
           <div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Stickers usage</h1>
-            <p className="text-sm font-medium text-slate-500">Per customer and inquiry</p>
+            <p className="text-sm font-medium text-slate-500">Validation and refilled inquiry deductions</p>
           </div>
         </div>
       </div>
@@ -137,15 +137,16 @@ const StickersUsagePage = () => {
             <thead>
               <tr className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 bg-slate-50/50">
                 <th className="px-8 py-5">Customer name</th>
-                <th className="px-8 py-5">Service type</th>
-                <th className="px-8 py-5">Inquiry ID</th>
-                <th className="px-8 py-5">Date used</th>
+                <th className="px-8 py-5">Inquiry</th>
+                <th className="px-8 py-5">Type</th>
+                <th className="px-8 py-5">Quantity</th>
+                <th className="px-8 py-5">Date</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {loading && (
                 <tr>
-                  <td colSpan={4} className="px-8 py-16 text-center">
+                  <td colSpan={5} className="px-8 py-16 text-center">
                     <Loader2 className="animate-spin text-primary-500 mx-auto mb-2" size={36} />
                     <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Loading…</p>
                   </td>
@@ -153,7 +154,7 @@ const StickersUsagePage = () => {
               )}
               {!loading && displayRows.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-8 py-16 text-center text-slate-500 font-bold text-sm">
+                  <td colSpan={5} className="px-8 py-16 text-center text-slate-500 font-bold text-sm">
                     No sticker usage yet
                   </td>
                 </tr>
@@ -162,14 +163,13 @@ const StickersUsagePage = () => {
                 displayRows.map((r) => (
                   <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-8 py-5 font-bold text-slate-900">{r.customerName}</td>
+                    <td className="px-8 py-5 text-sm font-semibold text-primary-700">{r.inquiryDisplay}</td>
                     <td className="px-8 py-5">
                       <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-700">
                         {r.serviceLabel}
                       </span>
                     </td>
-                    <td className="px-8 py-5 font-mono text-sm text-primary-600 font-semibold">
-                      {r.inquiryDisplay}
-                    </td>
+                    <td className="px-8 py-5 text-sm text-slate-700 font-semibold">{r.quantity}</td>
                     <td className="px-8 py-5 text-sm text-slate-600">{formatDateUsed(r.usedAt)}</td>
                   </tr>
                 ))}
@@ -193,10 +193,17 @@ const StickersUsagePage = () => {
                 key={r.id}
                 className="rounded-2xl border border-slate-100 p-4 bg-slate-50/50"
               >
-                <p className="font-black text-slate-900">{r.customerName}</p>
-                <p className="text-xs font-bold text-primary-600 mt-1 font-mono">{r.inquiryDisplay}</p>
+                <div className="flex justify-between items-start gap-3">
+                  <div>
+                    <p className="font-black text-slate-900">{r.customerName}</p>
+                    <p className="text-xs font-semibold text-primary-700 mt-1">{r.inquiryDisplay}</p>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-700">
+                    {r.serviceLabel}
+                  </span>
+                </div>
                 <div className="flex justify-between items-center mt-3 text-xs text-slate-500">
-                  <span className="font-black uppercase tracking-wider text-slate-600">{r.serviceLabel}</span>
+                  <span>Qty: <span className="font-bold text-slate-700">{r.quantity}</span></span>
                   <span>{formatDateUsed(r.usedAt)}</span>
                 </div>
               </div>

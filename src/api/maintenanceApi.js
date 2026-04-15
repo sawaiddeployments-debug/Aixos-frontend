@@ -12,8 +12,8 @@ const extractApiData = (response, fallback = null) => {
  * Partner maintenance documentation — all persistence via Express API (no Supabase in browser).
  */
 
-export const acceptInquiry = async (inquiryId) => {
-    const response = await client.patch(`/inquiries/${inquiryId}/accept`);
+export const acceptInquiry = async (inquiryId, payload = {}) => {
+    const response = await client.patch(`/inquiries/${inquiryId}/accept`, payload);
     return extractApiData(response, null);
 };
 
@@ -135,5 +135,28 @@ export const createQuotation = async ({ inquiryId, partnerId, customerId, estima
 /** GET /quotation/:inquiryId - returns quotation row */
 export const fetchQuotationByInquiryId = async (inquiryId) => {
     const response = await client.get(`/quotations/${inquiryId}`);
+    return extractApiData(response, null);
+};
+
+export const confirmDeliverySchedule = async (inquiryId) => {
+    const response = await client.patch(`/inquiries/${inquiryId}/confirm-delivery`);
+    return extractApiData(response, null);
+};
+
+export const rejectDeliverySchedule = async (inquiryId) => {
+    const response = await client.patch(`/inquiries/${inquiryId}/reject-delivery`);
+    return extractApiData(response, null);
+};
+
+export const finalAcceptInquiry = async (inquiryId) => {
+    const response = await client.patch(`/inquiries/${inquiryId}/final-accept`);
+    return extractApiData(response, null);
+};
+
+export const switchPartner = async (inquiryId, { new_partner_id, reason }) => {
+    const response = await client.patch(`/inquiries/${inquiryId}/switch-partner`, {
+        new_partner_id,
+        reason
+    });
     return extractApiData(response, null);
 };

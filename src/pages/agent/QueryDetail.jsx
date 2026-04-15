@@ -19,6 +19,14 @@ import {
     Building2
 } from 'lucide-react';
 import PageLoader from '../../components/PageLoader';
+import {
+    confirmDeliverySchedule,
+    rejectDeliverySchedule,
+    switchPartner
+} from '../../api/maintenanceApi';
+import SwitchPartnerModal from './components/SwitchPartnerModal';
+import { toast } from 'react-hot-toast';
+import { Truck, Clock, CheckCircle, AlertCircle, UserPlus } from 'lucide-react';
 
 const QueryDetail = () => {
     const { id } = useParams();
@@ -27,86 +35,176 @@ const QueryDetail = () => {
     const [customer, setCustomer] = useState(null);
     const [quotation, setQuotation] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [isSwitchModalOpen, setIsSwitchModalOpen] = useState(false);
 
     useEffect(() => {
-        const fetchQueryDetail = async () => {
-            setLoading(true);
-            try {
-                const { data: inquiryData, inquiryError } = await supabase
-                    .from('inquiries')
-                    .select(`
-                        *,
-                        visits (
-                            visit_date,
-                            agent_id
-                        )
-                    `)
-                    .eq('id', id)
-                    .single();
-
-                if (inquiryError) throw inquiryError;
-
-                const { data: itemsData, error: itemsError } = await supabase
-                    .from('inquiry_items')
-                    .select('*, follow_up_history(*)')
-                    .eq('inquiry_id', id)
-                    .order('created_at', { foreignTable: 'follow_up_history', ascending: false });
-
-                if (itemsError) throw itemsError;
-
-                const { data: quotationData } = await supabase
-                    .from('quotations')
-                    .select('estimated_cost, created_at')
-                    .eq('inquiry_id', id)
-                    .single();
-
-                setQuotation(quotationData);
-
-                const allItems = itemsData || [];
-                const sortedItems = [...allItems].sort((a, b) => (a.serial_no || 0) - (b.serial_no || 0));
-
-                const primaryQuery = {
-                    ...inquiryData,
-                    inquiry_items: sortedItems
-                };
-
-                setQuery(primaryQuery);
-
-                if (inquiryData.customer_id) {
-                    const { data: customerData } = await supabase
-                        .from('customers')
-                        .select('*')
-                        .eq('id', inquiryData.customer_id)
-                        .single();
-
-                    if (customerData) setCustomer(customerData);
-                }
-
-                if (inquiryData?.agent_id) {
-                    const { data: agentData } = await supabase
-                        .from('agents')
-                        .select('name, email')
-                        .eq('id', inquiryData.agent_id)
-                        .single();
-
-                    if (agentData) {
-                        primaryQuery.agent = agentData;
-                        setQuery({ ...primaryQuery });
-                    }
-                }
-
-            } catch (err) {
-                console.error('Error fetching query detail:', err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchQueryDetail();
     }, [id]);
 
+    const fetchQueryDetail = async () => {
+        setLoading(true);
+        try {
+            const { data: inquiryData, inquiryError } = await supabase
+                .from('inquiries')
+                .select(`
+                    *,
+                    visits (
+                        visit_date,
+                        agent_id
+                    ),
+                    partners (
+                        business_name,
+                        email
+                    )
+                `)
+                .eq('id', id)
+                .single();
+
+            if (inquiryError) throw inquiryError;
+
+            let itemsRes = await supabase
+                .from('inquiry_items')
+                .select('*, follow_up_history(*)')
+                .eq('inquiry_id', id)
+                .order('created_at', { foreignTable: 'follow_up_history', ascending: false });
+
+            if (itemsRes.error) {
+                const errText = `${itemsRes.error?.message || ''} ${itemsRes.error?.details || ''}`;
+                const followUpMissing = /follow_up_history|PGRST204|schema cache|column/i.test(errText);
+                if (followUpMissing) {
+                    itemsRes = await supabase
+                        .from('inquiry_items')
+                        .select('*')
+                        .eq('inquiry_id', id);
+                }
+            }
+
+            const { data: itemsData, error: itemsError } = itemsRes;
+            if (itemsError) throw itemsError;
+
+            const { data: quotationData } = await supabase
+                .from('quotations')
+                .select('estimated_cost, created_at')
+                .eq('inquiry_id', id)
+                .single();
+
+            setQuotation(quotationData);
+
+            const allItems = (itemsData || []).map((item) => ({
+                ...item,
+                follow_up_history: Array.isArray(item.follow_up_history) ? item.follow_up_history : [],
+            }));
+            const sortedItems = [...allItems].sort((a, b) => (a.serial_no || 0) - (b.serial_no || 0));
+
+            const primaryQuery = {
+                ...inquiryData,
+                inquiry_items: sortedItems
+            };
+
+            setQuery(primaryQuery);
+
+            if (inquiryData.customer_id) {
+                const { data: customerData } = await supabase
+                    .from('customers')
+                    .select('*')
+                    .eq('id', inquiryData.customer_id)
+                    .single();
+
+                if (customerData) setCustomer(customerData);
+            }
+
+            if (inquiryData?.agent_id) {
+                const { data: agentData } = await supabase
+                    .from('agents')
+                    .select('name, email')
+                    .eq('id', inquiryData.agent_id)
+                    .single();
+
+                if (agentData) {
+                    primaryQuery.agent = agentData;
+                    setQuery({ ...primaryQuery });
+                }
+            }
+
+        } catch (err) {
+            console.error('Error fetching query detail:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const formatDate = (date) =>
-        date ? new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+        date ? new Date(date).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : 'N/A';
+
+    const handleConfirmDelivery = async () => {
+        setActionLoading(true);
+        try {
+            try {
+                await confirmDeliverySchedule(id);
+            } catch (apiErr) {
+                const text = `${apiErr?.message || ''} ${apiErr?.response?.data?.error || ''}`;
+                const constraintHit = /check_delivery_status|violates check constraint/i.test(text);
+                if (!constraintHit) throw apiErr;
+                // Fallback for environments where API sends legacy/invalid enum values.
+                const { error: fallbackErr } = await supabase
+                    .from('inquiries')
+                    .update({ delivery_status: 'confirmed' })
+                    .eq('id', id);
+                if (fallbackErr) throw fallbackErr;
+            }
+            toast.success('Delivery schedule confirmed.');
+            await fetchQueryDetail();
+        } catch {
+            toast.error('Failed to confirm delivery schedule.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleRejectDelivery = async () => {
+        setActionLoading(true);
+        try {
+            try {
+                await rejectDeliverySchedule(id);
+            } catch (apiErr) {
+                const text = `${apiErr?.message || ''} ${apiErr?.response?.data?.error || ''}`;
+                const constraintHit = /check_delivery_status|violates check constraint/i.test(text);
+                if (!constraintHit) throw apiErr;
+                const { error: fallbackErr } = await supabase
+                    .from('inquiries')
+                    .update({ delivery_status: 'rejected' })
+                    .eq('id', id);
+                if (fallbackErr) throw fallbackErr;
+            }
+            toast.success('Delivery schedule rejected.');
+            await fetchQueryDetail();
+        } catch {
+            toast.error('Failed to reject delivery schedule.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleSwitchPartner = async (payload) => {
+        setActionLoading(true);
+        try {
+            await switchPartner(id, payload);
+            toast.success('Partner switched successfully.');
+            setIsSwitchModalOpen(false);
+            await fetchQueryDetail();
+        } catch {
+            toast.error('Failed to switch partner.');
+        } finally {
+            setActionLoading(false);
+        }
+    };
 
     const primaryItem = query?.inquiry_items?.[0] || null;
 
@@ -158,6 +256,55 @@ const QueryDetail = () => {
                         <p className="text-xs text-blue-500 uppercase font-bold tracking-widest">Latest Follow-up Scheduled</p>
                         <p className="font-semibold text-blue-900">{formatDate(query.last_updated_follow_up_date)}</p>
                     </div>
+                </div>
+            )}
+
+            {query.delivery_mode === 'partner' && (
+                <div className={`rounded-2xl border p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 ${query.delivery_status === 'pending' ? 'bg-amber-50 border-amber-200' : query.delivery_status === 'confirmed' ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+                    <div className="flex items-start gap-4">
+                        <div className={`p-4 rounded-2xl ${query.delivery_status === 'pending' ? 'bg-amber-100 text-amber-600' : query.delivery_status === 'confirmed' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                            <Truck size={24} />
+                        </div>
+                        <div className="space-y-1">
+                            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                                Partner Proposes Logistics
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-black ${query.delivery_status === 'pending' ? 'bg-amber-200 text-amber-800' : query.delivery_status === 'confirmed' ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'}`}>
+                                    {query.delivery_status}
+                                </span>
+                            </h3>
+                            <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-600 font-medium">
+                                <div className="flex items-center gap-2">
+                                    <Clock size={14} className="text-slate-400" />
+                                    Pickup: <span className="text-slate-900 font-bold">{formatDate(query.pickup_date)}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Calendar size={14} className="text-slate-400" />
+                                    Delivery: <span className="text-slate-900 font-bold">{formatDate(query.delivery_date)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {query.delivery_status === 'pending' && (
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleRejectDelivery}
+                                disabled={actionLoading}
+                                className="px-6 py-3 bg-white border border-rose-200 text-rose-600 font-black text-xs uppercase tracking-widest rounded-xl hover:bg-rose-50 transition-all flex items-center gap-2"
+                            >
+                                <AlertCircle size={16} />
+                                Reject
+                            </button>
+                            <button
+                                onClick={handleConfirmDelivery}
+                                disabled={actionLoading}
+                                className="px-6 py-3 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-slate-800 shadow-xl shadow-slate-200 transition-all flex items-center gap-2"
+                            >
+                                <CheckCircle size={16} />
+                                Confirm Schedule
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -328,6 +475,19 @@ const QueryDetail = () => {
                                     <p className="font-medium">{formatDate(query.visits.visit_date)}</p>
                                 </div>
                             )}
+
+                            {primaryItem?.follow_up_date && (
+                                <div className="pt-2 border-t border-slate-50">
+                                    <p className="text-xs text-slate-500">Follow-up Date</p>
+                                    <p className="font-bold">
+                                        {new Date(primaryItem.follow_up_date).toLocaleDateString('en-US', {
+                                            year: 'numeric',
+                                            month: 'short',
+                                            day: 'numeric'
+                                        })}
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </section>
 
@@ -344,9 +504,41 @@ const QueryDetail = () => {
                                     {quotation.estimated_cost ? `SAR ${quotation.estimated_cost}` : '—'}
                                 </p>
                             </div>
-                            
+
                         </section>
                     )}
+
+                    {/* Partner Management */}
+                    <section className="bg-white rounded-3xl border p-6 space-y-4">
+                        <div className="flex items-center gap-2 border-b pb-4">
+                            <UserPlus className="text-blue-500" size={20} />
+                            <h2 className="font-bold">Partner Management</h2>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assigned Partner</p>
+                            <p className="font-black text-slate-900">{query.partners?.business_name || 'Unassigned'}</p>
+                            <p className="text-xs text-slate-500">{query.partners?.email}</p>
+                        </div>
+
+                        {query.delivery_mode && (
+                            <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-2">
+                                <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Logistics Details</p>
+                                <div className="space-y-1">
+                                    <p className="text-xs text-slate-500">Delivery Mode: <span className="text-slate-900 font-bold uppercase">{query.delivery_mode}</span></p>
+                                    {query.pickup_date && (
+                                        <p className="text-xs text-slate-500">Pickup Date: <span className="text-slate-900 font-bold">{formatDate(query.pickup_date)}</span></p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        <button
+                            onClick={() => setIsSwitchModalOpen(true)}
+                            className="w-full py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl text-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                        >
+                            <UserPlus size={16} />
+                            Switch Partner
+                        </button>
+                    </section>
 
                     {/* Quick Actions */}
                     <section className="bg-white rounded-3xl border p-6 text-center space-y-4">
@@ -361,6 +553,14 @@ const QueryDetail = () => {
                     </section>
                 </div>
             </div>
+
+            <SwitchPartnerModal
+                isOpen={isSwitchModalOpen}
+                onClose={() => setIsSwitchModalOpen(false)}
+                onSwitch={handleSwitchPartner}
+                loading={actionLoading}
+                currentPartnerId={query.partner_id}
+            />
         </div>
     );
 };

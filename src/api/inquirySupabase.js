@@ -13,6 +13,16 @@ function isLikelyMissingColumnError(err) {
   return /column|schema cache|does not exist|PGRST204/i.test(text);
 }
 
+function isMissingRpcFunctionError(err) {
+  const text = `${err?.code || ''} ${err?.message || ''} ${err?.details || ''}`;
+  return /PGRST202|Could not find the function|schema cache/i.test(text);
+}
+
+function isLegacyStickerCodeConstraintError(err) {
+  const text = `${err?.code || ''} ${err?.message || ''} ${err?.details || ''}`;
+  return /23502|sticker_code|violates not-null constraint/i.test(text);
+}
+
 const CORE_INQUIRY_KEYS = new Set([
   'inquiry_no',
   'customer_id',
@@ -24,7 +34,15 @@ const CORE_INQUIRY_KEYS = new Set([
   'visit_id',
   'performed_by',
   'follow_up_date',
+  'qr_code_value',
 ]);
+
+function normalizeStickerUsedFor(typeValue) {
+  const t = String(typeValue || '').trim().toLowerCase();
+  if (t === 'validation') return 'validation';
+  if (t === 'refilled' || t === 'refill') return 'refilled';
+  return null;
+}
 
 /**
  * Insert inquiry + items directly into Supabase when the REST API is unreachable.
@@ -33,6 +51,28 @@ const CORE_INQUIRY_KEYS = new Set([
 export async function createInquiryViaSupabase(inquiryData, items) {
   if (!inquiryData?.customer_id || !inquiryData?.inquiry_no || !inquiryData?.type) {
     throw new Error('createInquiryViaSupabase: missing inquiry_no, customer_id, or type');
+  }
+
+  const normalizedType = normalizeStickerUsedFor(inquiryData?.type);
+  if (normalizedType && !inquiryData?.partner_id) {
+    const err = new Error('Partner is required for this inquiry type');
+    err.status = 400;
+    throw err;
+  }
+
+  const { data: existingInquiry, error: existingInquiryErr } = await supabase
+    .from('inquiries')
+    .select('id')
+    .eq('inquiry_no', inquiryData.inquiry_no)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingInquiryErr) {
+    throwReadableDbError(existingInquiryErr, 'Could not validate duplicate inquiry');
+  }
+
+  if (existingInquiry?.id) {
+    throw new Error('Duplicate inquiry request detected');
   }
 
   const inquiryRow = {
@@ -49,7 +89,6 @@ export async function createInquiryViaSupabase(inquiryData, items) {
     'visit_id',
     'performed_by',
     'follow_up_date',
-    'follow_up_history',
     'qr_code_value',
     'internal_reference_number',
     'notes',
@@ -61,8 +100,6 @@ export async function createInquiryViaSupabase(inquiryData, items) {
       const v = inquiryData[k];
       if (v !== undefined && v !== null && v !== '') {
         inquiryRow[k] = v;
-      } else if (k === 'follow_up_history' && Array.isArray(inquiryData[k])) {
-        inquiryRow[k] = inquiryData[k];
       }
     }
   });
@@ -92,6 +129,28 @@ export async function createInquiryViaSupabase(inquiryData, items) {
   const inquiryId = inq.id;
   const customerId = inquiryData.customer_id;
   const itemList = Array.isArray(items) ? items : [];
+  const shouldConsumeSticker = Boolean(inquiryData?.partner_id && normalizedType);
+
+  if (shouldConsumeSticker) {
+    const { data: partnerRow, error: partnerErr } = await supabase
+      .from('partners')
+      .select('id, stickers_total')
+      .eq('id', inquiryData.partner_id)
+      .maybeSingle();
+
+    if (partnerErr) {
+      throwReadableDbError(partnerErr, 'Could not validate partner sticker balance');
+    }
+
+    if (!partnerRow?.id) {
+      throw new Error('Partner not found for sticker validation');
+    }
+
+    const current = Number(partnerRow.stickers_total ?? 0);
+    if (current <= 0) {
+      throw new Error('No stickers available');
+    }
+  }
 
   const itemRows = itemList.map((it) => {
     const row = {
@@ -128,6 +187,169 @@ export async function createInquiryViaSupabase(inquiryData, items) {
       console.error('[createInquiryViaSupabase] inquiry_items insert', itemsErr);
       throwReadableDbError(itemsErr, 'Could not save inquiry line items');
     }
+  }
+
+  if (shouldConsumeSticker) {
+    const applyStickerFallback = async () => {
+      const usedFor = normalizedType;
+
+      const { data: existingHistory, error: historyCheckErr } = await supabase
+        .from('sticker_usage_history')
+        .select('id')
+        .eq('inquiry_id', inquiryId)
+        .limit(1)
+        .maybeSingle();
+
+      if (historyCheckErr) {
+        throwReadableDbError(historyCheckErr, 'Could not validate sticker usage history');
+      }
+
+      if (existingHistory?.id) {
+        console.log('[sticker-usage:fallback]', {
+          partner_id: inquiryData.partner_id,
+          inquiry_id: inquiryId,
+          skipped_duplicate: true,
+        });
+        return;
+      }
+
+      const { data: partnerBefore, error: partnerBeforeErr } = await supabase
+        .from('partners')
+        .select('id, stickers_total')
+        .eq('id', inquiryData.partner_id)
+        .maybeSingle();
+
+      if (partnerBeforeErr) {
+        throwReadableDbError(partnerBeforeErr, 'Could not read partner stickers');
+      }
+      if (!partnerBefore?.id) {
+        throw new Error('Partner not found for sticker validation');
+      }
+
+      const before = Number(partnerBefore.stickers_total ?? 0);
+      if (before <= 0) {
+        throw new Error('No stickers available');
+      }
+
+      const next = before - 1;
+      const { data: partnerAfter, error: partnerUpdateErr } = await supabase
+        .from('partners')
+        .update({ stickers_total: next })
+        .eq('id', inquiryData.partner_id)
+        .eq('stickers_total', before)
+        .select('stickers_total')
+        .maybeSingle();
+
+      if (partnerUpdateErr) {
+        throwReadableDbError(partnerUpdateErr, 'Could not deduct sticker');
+      }
+
+      if (!partnerAfter) {
+        throw new Error('Sticker balance changed, please retry');
+      }
+
+      const { error: historyInsertErr } = await supabase
+        .from('sticker_usage_history')
+        .insert([
+          {
+            partner_id: inquiryData.partner_id,
+            inquiry_id: inquiryId,
+            used_for: usedFor,
+            quantity: 1,
+          },
+        ]);
+
+      let finalHistoryInsertErr = historyInsertErr;
+
+      // Legacy DB compatibility: some environments still require sticker_code NOT NULL.
+      if (finalHistoryInsertErr && isLegacyStickerCodeConstraintError(finalHistoryInsertErr)) {
+        const fallbackCode = `AUTO-${String(inquiryId).slice(0, 8).toUpperCase()}`;
+        const retryWithLegacyCode = await supabase
+          .from('sticker_usage_history')
+          .insert([
+            {
+              partner_id: inquiryData.partner_id,
+              inquiry_id: inquiryId,
+              used_for: usedFor,
+              quantity: 1,
+              sticker_code: fallbackCode,
+            },
+          ]);
+
+        // If sticker_code column does not exist, retry once without it.
+        if (retryWithLegacyCode.error && isLikelyMissingColumnError(retryWithLegacyCode.error)) {
+          const retryWithoutLegacyCode = await supabase
+            .from('sticker_usage_history')
+            .insert([
+              {
+                partner_id: inquiryData.partner_id,
+                inquiry_id: inquiryId,
+                used_for: usedFor,
+                quantity: 1,
+              },
+            ]);
+          finalHistoryInsertErr = retryWithoutLegacyCode.error || null;
+        } else {
+          finalHistoryInsertErr = retryWithLegacyCode.error || null;
+        }
+      }
+
+      if (finalHistoryInsertErr) {
+        // Best effort compensation to keep counts balanced.
+        await supabase
+          .from('partners')
+          .update({ stickers_total: before })
+          .eq('id', inquiryData.partner_id)
+          .eq('stickers_total', next);
+        throwReadableDbError(finalHistoryInsertErr, 'Could not save sticker usage history');
+      }
+
+      console.log('[sticker-usage:fallback]', {
+        partner_id: inquiryData.partner_id,
+        inquiry_id: inquiryId,
+        sticker_before: before,
+        sticker_after: next,
+        skipped_duplicate: false,
+      });
+    };
+
+    const { data: consumeResult, error: consumeErr } = await supabase.rpc(
+      'consume_partner_sticker_for_inquiry',
+      {
+        p_partner_id: inquiryData.partner_id,
+        p_inquiry_id: inquiryId,
+        p_used_for: normalizedType,
+      }
+    );
+
+    if (consumeErr) {
+      if (isMissingRpcFunctionError(consumeErr) || isLegacyStickerCodeConstraintError(consumeErr)) {
+        console.warn('[createInquiryViaSupabase] RPC missing, using fallback sticker flow');
+        try {
+          await applyStickerFallback();
+          return { id: inquiryId, via: 'supabase' };
+        } catch (fallbackErr) {
+          console.error('[createInquiryViaSupabase] fallback sticker consume failed', fallbackErr);
+          await supabase.from('inquiry_items').delete().eq('inquiry_id', inquiryId);
+          await supabase.from('inquiries').delete().eq('id', inquiryId);
+          throw fallbackErr;
+        }
+      }
+
+      console.error('[createInquiryViaSupabase] sticker consume failed', consumeErr);
+      await supabase.from('inquiry_items').delete().eq('inquiry_id', inquiryId);
+      await supabase.from('inquiries').delete().eq('id', inquiryId);
+      throwReadableDbError(consumeErr, 'Could not deduct sticker');
+    }
+
+    const consumeRow = Array.isArray(consumeResult) ? consumeResult[0] : consumeResult;
+    console.log('[sticker-usage]', {
+      partner_id: inquiryData.partner_id,
+      inquiry_id: inquiryId,
+      sticker_before: consumeRow?.stickers_before ?? null,
+      sticker_after: consumeRow?.stickers_after ?? null,
+      skipped_duplicate: Boolean(consumeRow?.skipped_duplicate),
+    });
   }
 
   return { id: inquiryId, via: 'supabase' };

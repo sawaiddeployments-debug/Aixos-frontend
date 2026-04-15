@@ -103,7 +103,7 @@ const PartnerDashboard = () => {
                 ]);
                 setStickerSummary({
                     used: stickers.stickersUsed ?? 0,
-                    total: stickers.stickersTotal ?? 0
+                    total: stickers.stickersAllocated ?? (stickers.stickersUsed ?? 0) + (stickers.stickersRemaining ?? 0)
                 });
 
                 const allInquiriesForStats = filterType === 'All' ? inquiriesData : await getInquiries({});

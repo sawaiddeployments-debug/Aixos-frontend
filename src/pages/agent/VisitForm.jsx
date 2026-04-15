@@ -110,19 +110,14 @@ const QrScanFieldGroup = ({
 
 
       <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
-        {isQrValid && needsQrScan ? (
+        {qrCodeValue === EXPECTED_VISIT_QR ? (
           <span className="flex items-center gap-1.5 text-green-700">
             <CheckCircle2 size={18} aria-hidden /> Verified
           </span>
         ) : null}
-        {needsQrScan && qrCodeValue && !isQrValid ? (
+        {qrCodeValue && qrCodeValue !== EXPECTED_VISIT_QR ? (
           <span className="flex items-center gap-1.5 text-red-600">
             <XCircle size={18} aria-hidden /> Invalid
-          </span>
-        ) : null}
-        {needsQrScan && !qrCodeValue ? (
-          <span className="flex items-center gap-1.5 text-amber-700">
-            <AlertTriangle size={16} aria-hidden /> Scan required
           </span>
         ) : null}
       </div>
@@ -263,6 +258,9 @@ const VisitForm = () => {
   });
 
   const [qrPreview, setQrPreview] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [isSelectedCustomerImageLoading, setIsSelectedCustomerImageLoading] = useState(false);
+  const [selectedCustomerImageError, setSelectedCustomerImageError] = useState(false);
 
   const [extinguishers, setExtinguishers] = useState([
     {
@@ -307,8 +305,24 @@ const VisitForm = () => {
     [extinguishers]
   );
 
-  /** Gate: valid when QR is not required for this visit, or scanned value matches expected code */
-  const isQrValid = !needsQrScan || qrCodeValue === EXPECTED_VISIT_QR;
+  /** Gate: valid if matches expected code */
+  const isQrValid = qrCodeValue === EXPECTED_VISIT_QR;
+
+  useEffect(() => {
+    if (selectedCustomer) {
+      console.log('selectedCustomer:', selectedCustomer);
+    }
+  }, [selectedCustomer]);
+
+  const customerInitial = (customer) => {
+    const label = customer?.business_name || customer?.owner_name || formData.businessName || '';
+    return String(label).trim().charAt(0).toUpperCase() || 'C';
+  };
+
+  const inquiryTypeNeedsPartner = (typeValue) => {
+    const t = String(typeValue || '').trim().toLowerCase();
+    return t === 'validation' || t === 'refill' || t === 'refilled';
+  };
 
   const handleQrDecoded = (text) => {
     const qrValue = (text || '').trim();
@@ -426,7 +440,7 @@ const VisitForm = () => {
 
           const { data, error } = await supabase
             .from('customers')
-            .select('id, business_name, owner_name, email, phone, address, business_type')
+            .select('id, business_name, owner_name, email, phone, address, business_type, image_url')
             .or(searchFilter)
             .limit(10);
 
@@ -487,16 +501,20 @@ const VisitForm = () => {
   };
 
   const selectCustomer = (cust) => {
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       customerId: cust.id,
       businessName: cust.business_name || '',
       ownerName: cust.owner_name || '',
       phone: cust.phone || '',
       email: cust.email || '',
       address: cust.address || '',
-      businessType: cust.business_type || 'Retail Store - Grocery'
-    });
+      businessType: cust.business_type || 'Retail Store - Grocery',
+      customerPhoto: null,
+    }));
+    setSelectedCustomer(cust || null);
+    setSelectedCustomerImageError(false);
+    setIsSelectedCustomerImageLoading(Boolean(cust?.image_url));
     setSearchResults([]);
     setSearchQuery(''); // Clear search query immediately
     setIsNewCustomer(false);
@@ -683,6 +701,39 @@ const VisitForm = () => {
       e.target.value = '';
       const compressed = await compressVisitImageFile(file);
       if (compressed) {
+        // Existing customer: update profile image immediately.
+        if (!isNewCustomer && formData.customerId) {
+          setLoading(true);
+          try {
+            const newImageUrl = await uploadCustomerPhoto(compressed);
+            if (!newImageUrl) {
+              toast.error('Could not upload customer image');
+              return;
+            }
+            const { error: updateErr } = await supabase
+              .from('customers')
+              .update({
+                image_url: newImageUrl,
+                last_updated: new Date().toISOString(),
+              })
+              .eq('id', formData.customerId);
+            if (updateErr) throw updateErr;
+            setSelectedCustomer((prev) => (
+              prev ? { ...prev, image_url: newImageUrl } : { id: formData.customerId, image_url: newImageUrl }
+            ));
+            setSelectedCustomerImageError(false);
+            setIsSelectedCustomerImageLoading(false);
+            setFormData(prev => ({ ...prev, customerPhoto: null }));
+            toast.success('Customer image updated');
+          } catch (err) {
+            console.error('Existing customer image update failed:', err);
+            toast.error('Failed to update customer image');
+          } finally {
+            setLoading(false);
+          }
+          return;
+        }
+
         setFormData(prev => ({ ...prev, customerPhoto: compressed }));
       }
     }
@@ -988,8 +1039,8 @@ const VisitForm = () => {
       return;
     }
 
-    if (!isQrValid) {
-      toast.error('Please scan the valid site QR code before submitting.');
+    if (qrCodeValue && !isQrValid) {
+      toast.error('Invalid QR Code. Please scan the valid site QR code or clear the field to proceed.');
       return;
     }
 
@@ -1116,6 +1167,13 @@ const VisitForm = () => {
       // 4. Create Inquiry Metadata
       const inquiryNo = `INQ-${Math.floor(100000 + Math.random() * 900000)}`;
       const inquiryType = extinguishers[0]?.mode || 'General';
+      const selectedPartnerId = uniquePartners[0] || null;
+
+      if (inquiryTypeNeedsPartner(inquiryType) && !selectedPartnerId) {
+        toast.error('Please select a partner before creating inquiry');
+        setLoading(false);
+        return;
+      }
 
       // 5. Build Unified Data
       if (extinguishers.length > 0) {
@@ -1211,14 +1269,13 @@ const VisitForm = () => {
         const inquiryData = {
           inquiry_no: inquiryNo,
           customer_id: finalCustId,
-          partner_id: uniquePartners[0], // Only one partner is allowed per visit
+          partner_id: selectedPartnerId, // Only one partner is allowed per visit
           agent_id: user.id,
           visit_id: visitId,
           type: inquiryType,
           priority: 'Medium',
           performed_by: formData.performedBy || 'Agent',
           follow_up_date: formData.followUpDate || null,
-          follow_up_history: formData.followUpHistory || [],
           qr_code_value: needsQrScan ? (qrCodeValue || null) : null
         };
 
@@ -1286,7 +1343,10 @@ const VisitForm = () => {
             <button
               onClick={() => {
                 setIsNewCustomer(false);
-                setFormData({ ...formData, customerId: null });
+                setFormData((prev) => ({ ...prev, customerId: null }));
+                setSelectedCustomer(null);
+                setSelectedCustomerImageError(false);
+                setIsSelectedCustomerImageLoading(false);
               }}
               className={`py-3.5 px-4 rounded-2xl text-sm font-bold transition-all border-2 
           ${!isNewCustomer
@@ -1300,8 +1360,11 @@ const VisitForm = () => {
             <button
               onClick={() => {
                 setIsNewCustomer(true);
-                setFormData({ ...formData, customerId: null });
+                setFormData((prev) => ({ ...prev, customerId: null }));
                 setSearchQuery('');
+                setSelectedCustomer(null);
+                setSelectedCustomerImageError(false);
+                setIsSelectedCustomerImageLoading(false);
               }}
               className={`py-3.5 px-4 rounded-2xl text-sm font-bold transition-all border-2 
           ${isNewCustomer
@@ -1342,7 +1405,18 @@ const VisitForm = () => {
                       onClick={() => selectCustomer(cust)}
                       className="p-4 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 flex justify-between items-center group"
                     >
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full overflow-hidden border border-slate-200 bg-slate-100 shrink-0 flex items-center justify-center">
+                          {cust.image_url ? (
+                            <img
+                              src={cust.image_url}
+                              alt={cust.business_name || 'Customer'}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-sm font-bold text-slate-500">{customerInitial(cust)}</span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-slate-900 truncate">{cust.business_name}</p>
                           <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono shrink-0">ID: {cust.id}</span>
@@ -1375,6 +1449,40 @@ const VisitForm = () => {
                   </p>
                 </div>
 
+                {!isNewCustomer && formData.customerId && (
+                  <div className="flex items-center gap-3 rounded-xl bg-white border border-slate-200 px-3 py-2">
+                    <div className="relative w-16 h-16 rounded-full overflow-hidden border border-slate-200 bg-slate-100 shrink-0 flex items-center justify-center">
+                      {selectedCustomer?.image_url && !selectedCustomerImageError ? (
+                        <>
+                          {isSelectedCustomerImageLoading && (
+                            <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                              <div className="h-5 w-5 animate-spin border-2 border-primary-500 border-t-transparent rounded-full" />
+                            </div>
+                          )}
+                          <img
+                            src={selectedCustomer.image_url}
+                            alt="Customer"
+                            className="w-16 h-16 object-cover"
+                            onLoad={() => setIsSelectedCustomerImageLoading(false)}
+                            onError={() => {
+                              setIsSelectedCustomerImageLoading(false);
+                              setSelectedCustomerImageError(true);
+                            }}
+                          />
+                        </>
+                      ) : (
+                        <span className="text-lg font-bold text-slate-500">{customerInitial(selectedCustomer)}</span>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase tracking-wider text-slate-400 font-bold">Customer</p>
+                      <p className="text-sm font-bold text-slate-800 truncate max-w-[180px]">
+                        {selectedCustomer?.business_name || formData.businessName || 'Selected customer'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {!isNewCustomer && (
                   <div className="flex items-center gap-2">
                     <button
@@ -1406,8 +1514,11 @@ const VisitForm = () => {
                         if (isEditingCustomer) {
                           setIsEditingCustomer(false);
                         } else {
-                          setFormData({ ...formData, customerId: null });
+                          setFormData((prev) => ({ ...prev, customerId: null }));
                           setSearchQuery('');
+                          setSelectedCustomer(null);
+                          setSelectedCustomerImageError(false);
+                          setIsSelectedCustomerImageLoading(false);
                         }
                       }}
                       className="px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors"
@@ -1553,10 +1664,36 @@ const VisitForm = () => {
                           />
                           <div className="flex items-center gap-2 text-sm font-bold text-primary-600 uppercase tracking-wider">
                             <Camera size={16} />
-                            Change Photo
+                            Change Image
                           </div>
                           <p className="text-xs text-slate-500 mt-2 font-medium">
                             Final size: {(formData.customerPhoto.size / 1024).toFixed(2)} KB (max 45 KB)
+                          </p>
+                        </div>
+                      ) : (!isNewCustomer && selectedCustomer?.image_url && !selectedCustomerImageError) ? (
+                        <div className="relative w-full p-4 flex flex-col items-center animate-fade-in">
+                          <div className="relative">
+                            {isSelectedCustomerImageLoading && (
+                              <div className="absolute inset-0 rounded-xl bg-white/80 flex items-center justify-center">
+                                <div className="h-5 w-5 animate-spin border-2 border-primary-500 border-t-transparent rounded-full" />
+                              </div>
+                            )}
+                            <img
+                              src={selectedCustomer.image_url}
+                              className="h-28 w-28 object-cover rounded-xl shadow-md border-2 border-white mb-3"
+                              alt="Customer"
+                              onLoad={() => setIsSelectedCustomerImageLoading(false)}
+                              onError={() => {
+                                setIsSelectedCustomerImageLoading(false);
+                                setSelectedCustomerImageError(true);
+                              }}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 text-sm font-bold text-slate-600 uppercase tracking-wider">
+                            Existing Photo (Change Image)
+                          </div>
+                          <p className="text-xs text-slate-500 mt-2 font-medium">
+                            Upload a new image only if you want to replace this one.
                           </p>
                         </div>
                       ) : (
@@ -2640,7 +2777,7 @@ const VisitForm = () => {
             <button
               type="button"
               onClick={() => setStep(3)}
-              disabled={!isQrValid}
+              disabled={qrCodeValue && !isQrValid}
               className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
             >
               Next: Site Assessment <ArrowRight size={18} />
@@ -2824,7 +2961,7 @@ const VisitForm = () => {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={loading || !isQrValid}
+                disabled={loading || (qrCodeValue && !isQrValid)}
                 className="btn-primary flex items-center gap-2 px-8 py-3 text-lg shadow-xl shadow-primary-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
               >
                 {loading ? 'Submitting...' : 'Finish & Save Log'} <Check size={20} />

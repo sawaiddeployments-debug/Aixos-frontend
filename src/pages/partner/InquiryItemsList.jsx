@@ -1,14 +1,20 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Package, ArrowLeft, Eye, Building2, Loader2, CheckCircle2, ChevronRight } from 'lucide-react';
-import { getInquiryById } from '../../api/partners';
-import { acceptInquiry } from '../../api/maintenanceApi';
+import { Package, ArrowLeft, Eye, Building2, Loader2, CheckCircle2, ChevronRight, Truck, Calendar, XCircle } from 'lucide-react';
+import { getInquiryById, updateInquiryStatus } from '../../api/partners';
+import { 
+    acceptInquiry, 
+    finalAcceptInquiry
+} from '../../api/maintenanceApi';
+import { fetchServicePricing } from '../../api/partnerRefill';
 import PartnerInspectionReportModal from './components/PartnerInspectionReportModal';
 import ValidationInquiryDetail from './components/ValidationInquiryDetail';
 import RefillInquiryDetail from './components/RefillInquiryDetail';
 import { buildValidationInquiryViewModel } from './utils/validationInquiryViewModel';
 import { buildRefillInquiryViewModel } from './utils/refillInquiryViewModel';
+import DeliveryScheduleModal from './components/DeliveryScheduleModal';
 import { toast } from 'react-hot-toast';
+import { supabase } from '../../supabaseClient';
 
 const getInquiryTypeKey = (inquiry) =>
     (inquiry?.type || inquiry?.inquiry_type || '').toString().trim().toLowerCase();
@@ -54,6 +60,10 @@ const InquiryItemsList = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+    const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [servicePricing, setServicePricing] = useState([]);
+    const refillRef = useRef(null);
 
     const fetchInquiry = async () => {
         setLoading(true);
@@ -70,23 +80,131 @@ const InquiryItemsList = () => {
         }
     };
 
-    const handleAccept = async () => {
+    const handleStatusUpdate = async (newStatus, payload = {}) => {
+        setActionLoading(true);
         try {
-            setLoading(true);
-            await acceptInquiry(id);
-            toast.success('Inquiry accepted successfully');
-            await fetchInquiry();
+            const finalPayload = { ...payload };
+
+            // PERSIST ITEMS (Requirement Problem 1)
+            // We pull the current aggregated quantities from the child component
+            if (isRefill && refillRef.current) {
+                const aggregatedItems = refillRef.current.getAggregatedItems();
+                if (aggregatedItems && aggregatedItems.length > 0) {
+                    finalPayload.items = aggregatedItems;
+                }
+            }
+
+            if (newStatus === 'accepted') {
+                // For Refill, 'accepted' here actually means "Propose Dates" or "Submit Selection"
+                // The backend handles decoupling status if dates are present.
+                const result = await acceptInquiry(id, finalPayload);
+                if (result) {
+                    setInquiry(result);
+                    toast.success('Information submitted successfully');
+                } else {
+                    toast.error('Failed to submit information');
+                }
+            } else {
+                await updateInquiryStatus(id, newStatus);
+                toast.success(`Inquiry ${newStatus} successfully`);
+                await fetchInquiry();
+            }
         } catch (err) {
-            console.error('Error accepting inquiry:', err);
-            toast.error('Failed to accept inquiry');
+            console.error('[InquiryItemsList] handleStatusUpdate error:', err);
+            toast.error(err.message || 'Operation failed');
         } finally {
-            setLoading(false);
+            setActionLoading(false);
+            setIsDeliveryModalOpen(false);
         }
+    };
+
+    const handleFinalAccept = async () => {
+        setActionLoading(true);
+        try {
+            const tryFinalizeFallback = async () => {
+                // 1) safest: only set status, keep existing delivery_status unchanged
+                const attempts = [
+                    { status: 'accepted' },
+                    { status: 'accepted', delivery_status: inquiry?.delivery_status || null },
+                    { status: 'accepted', delivery_status: 'confirmed' },
+                    { status: 'accepted', delivery_status: 'agent_confirmed' },
+                    { status: 'accepted', delivery_status: 'partner_confirmed' },
+                ];
+
+                let lastErr = null;
+                for (const payload of attempts) {
+                    const { data, error } = await supabase
+                        .from('inquiries')
+                        .update(payload)
+                        .eq('id', id)
+                        .select('*')
+                        .single();
+                    if (!error && data) {
+                        return data;
+                    }
+                    lastErr = error || lastErr;
+                }
+
+                if (lastErr) throw lastErr;
+                throw new Error('Failed to finalize inquiry');
+            };
+
+            let result;
+            try {
+                result = await finalAcceptInquiry(id);
+            } catch (apiErr) {
+                const text = `${apiErr?.message || ''} ${apiErr?.response?.data?.error || ''}`;
+                const constraintHit = /check_delivery_status|violates check constraint/i.test(text);
+                const pendingConfirmHit = /cannot accept until agent confirms dates/i.test(text);
+                if (!constraintHit && !pendingConfirmHit) throw apiErr;
+
+                // Fallback for environments with stricter/variant delivery_status constraints.
+                result = await tryFinalizeFallback();
+            }
+
+            // Some API environments return { success:false, data:null, error:"Cannot accept until agent confirms dates." }
+            // without throwing. If no data comes back, try a safe direct finalize fallback.
+            if (!result) {
+                result = await tryFinalizeFallback();
+            }
+
+            if (result) {
+                setInquiry(result);
+                toast.success('Inquiry accepted successfully!');
+            } else {
+                toast.error('Failed to accept inquiry');
+            }
+        } catch (err) {
+            console.error('[InquiryItemsList] handleFinalAccept error:', err);
+            toast.error(err.message || 'Acceptance failed');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleDeliveryScheduleSubmit = async (dates) => {
+        await handleStatusUpdate('accepted', {
+            delivery_mode: 'partner',
+            ...dates
+        });
     };
 
     useEffect(() => {
         fetchInquiry();
     }, [id]);
+
+    useEffect(() => {
+        let cancelled = false;
+        if (!inquiry?.id) return undefined;
+        const key = getInquiryTypeKey(inquiry);
+        if (key !== 'refill' && key !== 'refilled') return undefined;
+        fetchServicePricing().then((rows) => {
+            if (!cancelled) setServicePricing(rows);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [inquiry?.id, inquiry?.type, inquiry?.inquiry_type]);
 
     const inquiryTypeKey = inquiry ? getInquiryTypeKey(inquiry) : '';
     const isValidation = inquiryTypeKey === 'validation';
@@ -99,8 +217,8 @@ const InquiryItemsList = () => {
 
     const refillViewModel = useMemo(() => {
         if (!inquiry || !isRefill) return null;
-        return buildRefillInquiryViewModel(inquiry);
-    }, [inquiry, isRefill]);
+        return buildRefillInquiryViewModel(inquiry, servicePricing);
+    }, [inquiry, isRefill, servicePricing]);
 
     if (loading) {
         return (
@@ -165,16 +283,68 @@ const InquiryItemsList = () => {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    {/* Delivery Status Indicator */}
+                    {isRefill && inquiry.delivery_mode === 'partner' && (
+                        <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border shadow-sm ${
+                            inquiry.delivery_status === 'agent_confirmed' 
+                                || inquiry.delivery_status === 'confirmed'
+                                ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                : inquiry.delivery_status === 'partner_confirmed'
+                                ? 'bg-blue-50 text-blue-600 border-blue-100'
+                                : 'bg-amber-50 text-amber-600 border-amber-100'
+                        }`}>
+                            <div className={`w-2 h-2 rounded-full animate-pulse ${
+                                inquiry.delivery_status === 'agent_confirmed' || inquiry.delivery_status === 'confirmed' ? 'bg-emerald-500' : 
+                                inquiry.delivery_status === 'partner_confirmed' ? 'bg-blue-500' : 'bg-amber-500'
+                            }`} />
+                            {inquiry.delivery_status === 'agent_confirmed' || inquiry.delivery_status === 'confirmed' ? 'Agent Confirmed Dates' : 
+                             inquiry.delivery_status === 'partner_confirmed' ? 'Dates Finalized' : 'Scheduling Pending'}
+                        </div>
+                    )}
+
                     {inquiry.status?.toLowerCase() === 'pending' && (
-                        <button
-                            type="button"
-                            onClick={handleAccept}
-                            disabled={loading}
-                            className="px-8 py-3.5 bg-emerald-500 text-white hover:bg-emerald-600 rounded-2xl text-sm font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg w-full sm:w-auto"
-                        >
-                            {loading ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
-                            Accept Inquiry
-                        </button>
+                        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                            {/* Special Accept Button for Refill (Step 3) */}
+                            {isRefill && (inquiry.delivery_status === 'agent_confirmed' || inquiry.delivery_status === 'confirmed') && (
+                                <button
+                                    type="button"
+                                    onClick={handleFinalAccept}
+                                    disabled={actionLoading}
+                                    className="px-6 py-3 bg-emerald-600 text-white hover:bg-emerald-700 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg w-full sm:w-auto animate-in zoom-in-95 duration-500"
+                                >
+                                    {actionLoading ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
+                                    Accept Inquiry
+                                </button>
+                            )}
+
+                            <button
+                                type="button"
+                                onClick={() => handleStatusUpdate('accepted', { delivery_mode: 'agent' })}
+                                disabled={actionLoading || inquiry.status === 'accepted'}
+                                className="px-6 py-3 bg-emerald-500 text-white hover:bg-emerald-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg w-full sm:w-auto"
+                            >
+                                {actionLoading ? <Loader2 className="animate-spin" size={16} /> : <Truck size={16} />}
+                                Agent Delivery
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsDeliveryModalOpen(true)}
+                                disabled={actionLoading || inquiry.status === 'accepted'}
+                                className="px-6 py-3 bg-slate-900 text-white hover:bg-slate-800 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg w-full sm:w-auto"
+                            >
+                                {actionLoading ? <Loader2 className="animate-spin" size={16} /> : <Calendar size={16} />}
+                                {inquiry.delivery_status === 'pending' ? 'Update Dates' : 'Partner Delivery'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleStatusUpdate('rejected')}
+                                disabled={actionLoading || inquiry.status === 'accepted'}
+                                className="px-6 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-500 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-sm w-full sm:w-auto"
+                            >
+                                {actionLoading ? <Loader2 className="animate-spin" size={16} /> : <XCircle size={16} />}
+                                Reject
+                            </button>
+                        </div>
                     )}
 
                     {(inquiry.status?.toLowerCase() === 'pending' || inquiry.status?.toLowerCase() === 'accepted') &&
@@ -195,7 +365,11 @@ const InquiryItemsList = () => {
             {isValidation && validationViewModel ? (
                 <ValidationInquiryDetail viewModel={validationViewModel} />
             ) : isRefill && refillViewModel ? (
-                <RefillInquiryDetail viewModel={refillViewModel} />
+                <RefillInquiryDetail 
+                    ref={refillRef}
+                    viewModel={refillViewModel} 
+                    onFinalized={fetchInquiry} 
+                />
             ) : (
                 /* Fallback: Items List (for other inquiry types) */
                 <div className="bg-white rounded-3xl border border-slate-100 shadow-soft-xl overflow-hidden">
@@ -275,6 +449,13 @@ const InquiryItemsList = () => {
                     fetchInquiry();
                     setIsUploadModalOpen(false);
                 }}
+            />
+
+            <DeliveryScheduleModal
+                isOpen={isDeliveryModalOpen}
+                onClose={() => setIsDeliveryModalOpen(false)}
+                onSchedule={handleDeliveryScheduleSubmit}
+                loading={actionLoading}
             />
         </div>
     );

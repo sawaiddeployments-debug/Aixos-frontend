@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Bell, MessageSquare, Clock, Check, Trash2, AlertTriangle, FileText } from 'lucide-react';
+import { Bell, MessageSquare, Clock, Check, Trash2, AlertTriangle, FileText, Package } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { fetchCustomerInquiries, fetchCustomerQuotations } from '../api/customerPortal';
@@ -93,16 +93,21 @@ const NotificationBell = ({ onOpenChat }) => {
             
             if (!error && dbNotifs) {
                 dbNotifs.forEach((n) => {
+                    const isPartial = n.notification_type === 'partial_accept';
                     list.push({
-                         id: `notif-${n.id}`, 
-                         title: n.sender_role === 'partner' ? 'Partner Update' : 'New System Alert',
-                         message: n.message,
-                         type: 'message',
-                         timestamp: n.created_at,
-                         isRead: n.is_read,
-                         relatedId: n.inquiry_id,
-                         senderId: n.sender_id,
-                         senderRole: n.sender_role
+                        id: `notif-${n.id}`,
+                        title: isPartial
+                            ? 'Partial refill update'
+                            : n.sender_role === 'partner'
+                              ? 'Partner Update'
+                              : 'New System Alert',
+                        message: n.message,
+                        type: isPartial ? 'partial_accept' : 'message',
+                        timestamp: n.created_at,
+                        isRead: n.is_read,
+                        relatedId: n.inquiry_id,
+                        senderId: n.sender_id,
+                        senderRole: n.sender_role
                     });
                 });
             }
@@ -119,11 +124,50 @@ const NotificationBell = ({ onOpenChat }) => {
         }
     }, [user?.id]);
 
+    const loadAgentNotifications = useCallback(async () => {
+        if (!user?.id) return;
+        const list = [];
+        try {
+            const { data: dbNotifs, error } = await supabase
+                .from('notifications')
+                .select('*')
+                .eq('recipient_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(15);
+
+            if (!error && dbNotifs) {
+                dbNotifs.forEach((n) => {
+                    const isPartial = n.notification_type === 'partial_accept';
+                    list.push({
+                        id: `notif-${n.id}`,
+                        title: isPartial
+                            ? 'Partial refill update'
+                            : n.sender_role === 'partner'
+                              ? 'Partner update'
+                              : 'System alert',
+                        message: n.message,
+                        type: isPartial ? 'partial_accept' : 'message',
+                        timestamp: n.created_at,
+                        isRead: n.is_read,
+                        relatedId: n.inquiry_id,
+                        senderId: n.sender_id,
+                        senderRole: n.sender_role
+                    });
+                });
+            }
+        } catch (e) {
+            console.warn('NotificationBell agent db:', e);
+        }
+
+        list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        setNotifications(list.slice(0, 15));
+        setUnreadCount(list.filter((n) => !n.isRead).length);
+    }, [user?.id]);
+
     useEffect(() => {
         if (role === 'customer' && user?.id) {
             loadCustomerNotifications();
 
-            // REAL-TIME: Subscribe to new notifications for this user
             const channel = supabase
                 .channel(`user_notifications_${user.id}`)
                 .on(
@@ -133,8 +177,7 @@ const NotificationBell = ({ onOpenChat }) => {
                         table: 'notifications',
                         filter: `recipient_id=eq.${user.id}`
                     },
-                    (payload) => {
-                        console.log('🔔 REAL-TIME NOTIFICATION RECEIVED:', payload.new);
+                    () => {
                         loadCustomerNotifications();
                     }
                 )
@@ -143,11 +186,36 @@ const NotificationBell = ({ onOpenChat }) => {
             return () => {
                 supabase.removeChannel(channel);
             };
-        } else {
+        }
+
+        if (role === 'agent' && user?.id) {
+            loadAgentNotifications();
+
+            const channel = supabase
+                .channel(`user_notifications_agent_${user.id}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'INSERT',
+                        table: 'notifications',
+                        filter: `recipient_id=eq.${user.id}`
+                    },
+                    () => {
+                        loadAgentNotifications();
+                    }
+                )
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(channel);
+            };
+        }
+
+        if (role !== 'customer' && role !== 'agent') {
             setNotifications([]);
             setUnreadCount(0);
         }
-    }, [role, user?.id, loadCustomerNotifications]);
+    }, [role, user?.id, loadCustomerNotifications, loadAgentNotifications]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -182,6 +250,10 @@ const NotificationBell = ({ onOpenChat }) => {
 
     const handleNotificationClick = (notification) => {
         markAsRead(notification.id);
+        if (notification.type === 'partial_accept') {
+            setIsOpen(false);
+            return;
+        }
         if (notification.type === 'message' && onOpenChat) {
             // Pass inquiryId and sender info for the new real-time chat
             onOpenChat(notification.relatedId, {
@@ -206,6 +278,7 @@ const NotificationBell = ({ onOpenChat }) => {
     const iconFor = (n) => {
         if (n.type === 'expiry') return <AlertTriangle size={18} className="text-amber-600" />;
         if (n.type === 'quotation') return <FileText size={18} className="text-emerald-600" />;
+        if (n.type === 'partial_accept') return <Package size={18} className="text-purple-600" />;
         if (n.type === 'message') return <MessageSquare size={18} className="text-blue-600" />;
         return <Clock size={18} className="text-amber-600" />;
     };
@@ -213,6 +286,7 @@ const NotificationBell = ({ onOpenChat }) => {
     const bubbleClass = (n) => {
         if (n.type === 'expiry') return 'bg-amber-100 text-amber-700';
         if (n.type === 'quotation') return 'bg-emerald-100 text-emerald-700';
+        if (n.type === 'partial_accept') return 'bg-purple-100 text-purple-700';
         if (n.type === 'message') return 'bg-blue-100 text-blue-600';
         return 'bg-slate-100 text-slate-600';
     };
@@ -297,7 +371,9 @@ const NotificationBell = ({ onOpenChat }) => {
                                 <p className="text-xs text-slate-400 mt-1">
                                     {role === 'customer'
                                         ? 'Expiry and quotation alerts appear here'
-                                        : 'Alerts will appear when available'}
+                                        : role === 'agent'
+                                          ? 'Inquiry and refill updates appear here'
+                                          : 'Alerts will appear when available'}
                                 </p>
                             </div>
                         )}

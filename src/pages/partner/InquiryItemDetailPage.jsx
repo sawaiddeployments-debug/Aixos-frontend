@@ -28,6 +28,7 @@ import {
 import ChatModal from '../../components/Chat/ChatModal';
 import PartnerPostAcceptCard from './components/PartnerPostAcceptCard';
 import ScheduleDateModal from './components/ScheduleDateModal';
+import DeliveryScheduleModal from './components/DeliveryScheduleModal';
 import InquiryChatBox from '../../components/Chat/InquiryChatBox';
 import PartnerInspectionReportModal from './components/PartnerInspectionReportModal';
 import PartnerQuotationModal from './components/PartnerQuotationModal';
@@ -113,21 +114,44 @@ const MediaLink = ({ href, label, icon: Icon, isAudio = false }) => {
     );
 };
 
-const PartnerActionCard = ({ onAccept, onReject, disabled }) => (
+const PartnerActionCard = ({ onAccept, onAcceptWithDelivery, onReject, disabled, isInMaintenance }) => (
     <div className="bg-white rounded-[2rem] border border-slate-100 shadow-soft-xl p-8 w-full shrink-0 uppercase tracking-widest text-xs font-bold text-slate-500">
         <h4 className="text-center font-bold text-slate-600 mb-6 uppercase tracking-widest text-xs">
             Awaiting partner action
         </h4>
         <div className="flex flex-col gap-4">
-            <button
-                type="button"
-                onClick={onAccept}
-                disabled={disabled}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-emerald-200/80 text-white font-black py-4 rounded-full transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-widest"
-            >
-                <CheckCircle size={22} className="shrink-0" strokeWidth={2.5} />
-                Accept inquiry
-            </button>
+            {isInMaintenance ? (
+                <button
+                    type="button"
+                    onClick={onAccept}
+                    disabled={disabled}
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-emerald-200/80 text-white font-black py-4 rounded-full transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-widest"
+                >
+                    <CheckCircle size={22} className="shrink-0" strokeWidth={2.5} />
+                    Accept inquiry
+                </button>
+            ) : (
+                <>
+                    <button
+                        type="button"
+                        onClick={onAccept}
+                        disabled={disabled}
+                        className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-emerald-200/80 text-white font-black py-4 rounded-full transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-widest"
+                    >
+                        <Truck size={22} className="shrink-0" strokeWidth={2.5} />
+                        Agent Delivery
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onAcceptWithDelivery}
+                        disabled={disabled}
+                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 disabled:pointer-events-none shadow-lg shadow-slate-200 text-white font-black py-4 rounded-full transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-widest"
+                    >
+                        <Calendar size={22} className="shrink-0" strokeWidth={2.5} />
+                        Partner Delivery
+                    </button>
+                </>
+            )}
             <button
                 type="button"
                 onClick={onReject}
@@ -157,6 +181,7 @@ const InquiryItemDetailPage = () => {
     const [isQuotationModalOpen, setIsQuotationModalOpen] = useState(false);
     const [isNewUnitModalOpen, setIsNewUnitModalOpen] = useState(false);
     const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+    const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
 
     const loadInquiry = async ({ showPageLoader = true } = {}) => {
         if (showPageLoader) setLoading(true);
@@ -237,11 +262,16 @@ const InquiryItemDetailPage = () => {
         setIsChatOpen(true);
     };
 
-    const handleStatusUpdate = async (newStatus) => {
+    const handleStatusUpdate = async (newStatus, payload = {}) => {
         setActionLoading(true);
         try {
             if (newStatus === 'accepted') {
-                await acceptInquiry(inquiryId);
+                const finalPayload = {
+                    delivery_mode: payload.delivery_mode || 'agent',
+                    pickup_date: payload.pickup_date || null,
+                    delivery_date: payload.delivery_date || null
+                };
+                await acceptInquiry(inquiryId, finalPayload);
             } else {
                 await updateInquiryStatus(inquiryId, newStatus);
             }
@@ -251,7 +281,15 @@ const InquiryItemDetailPage = () => {
             toast.error(`Failed to ${newStatus} inquiry`);
         } finally {
             setActionLoading(false);
+            setIsDeliveryModalOpen(false);
         }
+    };
+
+    const handleDeliveryScheduleSubmit = async (dates) => {
+        await handleStatusUpdate('accepted', {
+            delivery_mode: 'partner',
+            ...dates
+        });
     };
 
     const handleScheduleDateSubmit = async (date) => {
@@ -700,9 +738,11 @@ const InquiryItemDetailPage = () => {
                 {isInquiryPending && (
                     <div className="lg:sticky lg:top-8 self-start w-full lg:w-[360px]">
                         <PartnerActionCard
-                            onAccept={() => handleStatusUpdate('accepted')}
+                            onAccept={() => handleStatusUpdate('accepted', { delivery_mode: 'agent' })}
+                            onAcceptWithDelivery={() => setIsDeliveryModalOpen(true)}
                             onReject={() => handleStatusUpdate('rejected')}
                             disabled={actionLoading}
+                            isInMaintenance={isMaintenanceInquiry}
                         />
                     </div>
                 )}
@@ -790,6 +830,13 @@ const InquiryItemDetailPage = () => {
                 isOpen={isScheduleModalOpen}
                 onClose={() => setIsScheduleModalOpen(false)}
                 onSchedule={handleScheduleDateSubmit}
+            />
+
+            <DeliveryScheduleModal
+                isOpen={isDeliveryModalOpen}
+                onClose={() => setIsDeliveryModalOpen(false)}
+                onSchedule={handleDeliveryScheduleSubmit}
+                loading={actionLoading}
             />
         </div>
     );
