@@ -3,7 +3,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { API_URL } from '../api/client';
 import { AGENT_STATUS, agentLoginBlockedMessage, fetchAgentApprovalStatus } from '../constants/agentApprovalStatus';
 
-const AuthContext = createContext(undefined);
+export const AuthContext = createContext(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -57,6 +57,20 @@ export const AuthProvider = ({ children }) => {
     if (!email || !password || !role) return { success: false, error: 'Email, password, and role are required' };
 
     try {
+      // For agents, check approval status from Supabase FIRST (source of truth)
+      if (role === 'agent') {
+        const status = await fetchAgentApprovalStatus({ email });
+        const s = (status || '').toLowerCase();
+        console.log('Agent approval status (pre-login):', status);
+
+        if (!status) {
+          return { success: false, error: 'Agent account not found. Please register first.' };
+        }
+        if (s !== AGENT_STATUS.ACCEPTED && s !== 'active') {
+          return { success: false, error: agentLoginBlockedMessage(status) };
+        }
+      }
+
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,24 +81,14 @@ export const AuthProvider = ({ children }) => {
 
       if (!response.ok) {
         if (role === 'agent') {
-          const status = await fetchAgentApprovalStatus({ email });
-          const s = (status || '').toLowerCase();
-          if (s && s !== AGENT_STATUS.ACCEPTED && s !== 'active') {
-            return { success: false, error: agentLoginBlockedMessage(status) };
+          // Agent is already confirmed accepted above — backend may have stale status.
+          // Filter out stale approval-related errors from the backend.
+          const errLower = (result.error || '').toLowerCase();
+          if (errLower.includes('pending') || errLower.includes('approval') || errLower.includes('approved') || errLower.includes('not active')) {
+            return { success: false, error: 'Invalid email or password' };
           }
         }
         return { success: false, error: result.error || 'Invalid credentials' };
-      }
-
-      if (role === 'agent') {
-        const status = await fetchAgentApprovalStatus({ id: result.user?.id, email });
-        const s = (status || '').toLowerCase();
-        if (s !== AGENT_STATUS.ACCEPTED && s !== 'active') {
-          return {
-            success: false,
-            error: agentLoginBlockedMessage(status),
-          };
-        }
       }
 
       // Save user and role in localStorage

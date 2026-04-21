@@ -114,12 +114,12 @@ const LandingPage = () => {
                             badges={['Route Planning', 'Commission Tracking', 'Digital Reports']}
                         />
                         <RoleCard
-                            to="/login/admin"
+                            to="/login/partner"
                             icon={Shield}
-                            title="Administrators"
-                            description="Full oversight of the marketplace. Monitor agency performance and service quality."
+                            title="Partner"
+                            description="Access partner dashboard to manage inquiries, pricing, and delivery coordination."
                             color="bg-slate-700 text-white"
-                            badges={['Analytics', 'User Management', 'Quality Control']}
+                            badges={['Inquiry Management', 'Quotations', 'Delivery Updates']}
                         />
                     </div>
                 </div>

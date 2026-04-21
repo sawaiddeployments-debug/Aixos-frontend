@@ -10,10 +10,10 @@ export const AGENT_STATUS = {
 
 export function agentLoginBlockedMessage(status) {
   const s = (status || '').toLowerCase();
-  if (s === AGENT_STATUS.PENDING) return 'Your account is not approved yet';
-  if (s === AGENT_STATUS.REJECTED) return 'Your account is rejected';
-  if (s === AGENT_STATUS.HOLD) return 'Your account is on hold. Contact admin';
-  return 'Your account is not approved yet';
+  if (s === AGENT_STATUS.PENDING) return 'Account pending approval';
+  if (s === AGENT_STATUS.REJECTED) return 'Your account has been rejected. Contact admin.';
+  if (s === AGENT_STATUS.HOLD) return 'Your account is on hold. Contact admin.';
+  return 'Account pending approval';
 }
 
 /** Used after API login and on session restore (mirrors SELECT status FROM agents WHERE …). */

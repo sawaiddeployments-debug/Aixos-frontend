@@ -115,20 +115,21 @@ export const aiService = {
   /**
    * Main function to interact with AI with strict filtering and prompt
    */
-  async askAI(question, partnerId, currentHistory = []) {
+  async askAI(question, partnerId, chatId, currentHistory = []) {
     try {
-      // 1. Get Targeted Context
       const context = await this.getFilteredContext(partnerId, question);
 
-      // 2. DEBUG LOG (Requirement 6)
       console.log('--- AI DEBUG LOG ---');
       console.log('User Question:', question);
+      console.log('Current Chat ID:', chatId);
       console.log('Filtered Context:', JSON.stringify(context, null, 2));
 
-      // 3. BLOCK EMPTY CONTEXT (Requirement 4)
-      const hasData = Object.keys(context).length > 2; // more than just date and name
+      const hasData = Object.keys(context).length > 2;
       if (!hasData && !question.toLowerCase().includes('hello') && !question.toLowerCase().includes('hi')) {
-        return "Data not available for this specific query.";
+        await this.saveMessage(chatId, 'user', question);
+        const noDataMsg = "Data not available for this specific query.";
+        await this.saveMessage(chatId, 'assistant', noDataMsg);
+        return noDataMsg;
       }
 
       const systemPrompt = `You are a Partner Dashboard AI assistant for AIXOS Firefighter.
@@ -162,9 +163,8 @@ ${JSON.stringify(context, null, 2)}
       
       const responseText = result.response.text();
 
-      // Save to History (Supabase)
-      await this.saveHistory(partnerId, 'user', question);
-      await this.saveHistory(partnerId, 'assistant', responseText);
+      await this.saveMessage(chatId, 'user', question);
+      await this.saveMessage(chatId, 'assistant', responseText);
 
       return responseText;
     } catch (error) {
@@ -176,19 +176,58 @@ ${JSON.stringify(context, null, 2)}
     }
   },
 
-  async saveHistory(partnerId, role, content) {
-    const { error } = await supabase
-      .from('ai_chat_history')
-      .insert([{ partner_id: partnerId, role, content }]);
-    if (error) console.error('Error saving chat history:', error);
+  async createChatSession(partnerId, title) {
+    const { data, error } = await supabase
+      .from('ai_chat_sessions')
+      .insert([{ partner_id: partnerId, title }])
+      .select()
+      .single();
+    if (error) {
+      console.error('Error creating chat session:', error);
+      throw error;
+    }
+    return data;
   },
 
-  async getChatHistory(partnerId) {
+  async saveMessage(chatId, role, message) {
+    const { error } = await supabase
+      .from('ai_chat_messages')
+      .insert([{ chat_id: chatId, role, message }]);
+    if (error) console.error('Error saving chat message:', error);
+  },
+
+  async getChatSessions(partnerId) {
     const { data, error } = await supabase
-      .from('ai_chat_history')
-      .select('*')
+      .from('ai_chat_sessions')
+      .select('*, ai_chat_messages(id, role, message, created_at)')
       .eq('partner_id', partnerId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('Error fetching chat sessions:', error);
+      return [];
+    }
     return data || [];
+  },
+
+  async getChatMessages(chatId) {
+    const { data, error } = await supabase
+      .from('ai_chat_messages')
+      .select('*')
+      .eq('chat_id', chatId)
+      .order('created_at', { ascending: true });
+    if (error) {
+      console.error('Error fetching chat messages:', error);
+      return [];
+    }
+    return data || [];
+  },
+
+  async deleteAllSessions(partnerId) {
+    const { error } = await supabase
+      .from('ai_chat_sessions')
+      .delete()
+      .eq('partner_id', partnerId);
+    if (error) console.error('Error clearing chat sessions:', error);
+    return !error;
   }
 };

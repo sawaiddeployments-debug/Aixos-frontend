@@ -6,7 +6,6 @@ import ChatHistorySidebar from './components/aiAgent/ChatHistorySidebar';
 import { aiService } from '../../services/ai.service';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-hot-toast';
-import { supabase } from '../../supabaseClient';
 
 const QUICK_ACTIONS = [
   { label: 'Today Summary', query: 'How many inquiries today?' },
@@ -17,16 +16,16 @@ const QUICK_ACTIONS = [
 const AiAgentPage = () => {
   const { user } = useAuth();
   const [messages, setMessages] = useState([]);
-  const [history, setHistory] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetchingHistory, setFetchingHistory] = useState(true);
-  const [selectedChatId, setSelectedChatId] = useState(null);
+  const [currentChatId, setCurrentChatId] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const scrollRef = useRef(null);
 
   useEffect(() => {
     if (user?.id) {
-      loadHistory();
+      loadSessions();
     }
   }, [user?.id]);
 
@@ -36,16 +35,13 @@ const AiAgentPage = () => {
     }
   }, [messages, loading]);
 
-  const loadHistory = async () => {
+  const loadSessions = async () => {
     setFetchingHistory(true);
     try {
-      const data = await aiService.getChatHistory(user.id);
-      setHistory(data);
-      if (data.length > 0) {
-        setMessages(data.slice(-20)); 
-      }
+      const data = await aiService.getChatSessions(user.id);
+      setSessions(data);
     } catch (error) {
-      console.error('Error loading history:', error);
+      console.error('Error loading sessions:', error);
     } finally {
       setFetchingHistory(false);
     }
@@ -54,10 +50,11 @@ const AiAgentPage = () => {
   const clearHistory = async () => {
     if (!window.confirm('Are you sure you want to clear your chat history?')) return;
     try {
-      const { error } = await supabase.from('ai_chat_history').delete().eq('partner_id', user.id);
-      if (error) throw error;
+      const success = await aiService.deleteAllSessions(user.id);
+      if (!success) throw new Error('Delete failed');
       setMessages([]);
-      setHistory([]);
+      setSessions([]);
+      setCurrentChatId(null);
       toast.success('History cleared');
     } catch (error) {
       toast.error('Failed to clear history');
@@ -70,10 +67,22 @@ const AiAgentPage = () => {
     setLoading(true);
 
     try {
-      const response = await aiService.askAI(query, user.id, messages);
+      let chatId = currentChatId;
+
+      if (!chatId) {
+        const title = query.length > 50 ? query.substring(0, 50) + '...' : query;
+        const session = await aiService.createChatSession(user.id, title);
+        chatId = session.id;
+        setCurrentChatId(chatId);
+        console.log('New chat session created:', chatId);
+      }
+
+      console.log('Sending message in chat:', chatId);
+
+      const response = await aiService.askAI(query, user.id, chatId, messages);
       const assistantMessage = { role: 'assistant', message: response, created_at: new Date().toISOString() };
       setMessages(prev => [...prev, assistantMessage]);
-      loadHistory();
+      loadSessions();
     } catch (error) {
       toast.error('AI was unable to respond. Please try again.');
     } finally {
@@ -81,12 +90,19 @@ const AiAgentPage = () => {
     }
   };
 
-  const handleSelectHistory = (chat) => {
-    setSelectedChatId(chat.id);
-    const element = document.getElementById(`msg-${chat.id}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const handleSelectChat = async (session) => {
+    setCurrentChatId(session.id);
+    try {
+      const msgs = await aiService.getChatMessages(session.id);
+      setMessages(msgs);
+    } catch (error) {
+      toast.error('Failed to load chat messages');
     }
+  };
+
+  const handleNewChat = () => {
+    setCurrentChatId(null);
+    setMessages([]);
   };
 
   return (
@@ -115,7 +131,7 @@ const AiAgentPage = () => {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={loadHistory}
+            onClick={loadSessions}
             className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
             title="Refresh History"
           >
@@ -135,9 +151,10 @@ const AiAgentPage = () => {
         <ChatHistorySidebar
           isOpen={showHistory}
           onClose={() => setShowHistory(false)}
-          history={history}
-          onSelectChat={handleSelectHistory}
-          selectedChatId={selectedChatId}
+          sessions={sessions}
+          onSelectChat={handleSelectChat}
+          selectedChatId={currentChatId}
+          onNewChat={handleNewChat}
           onClearHistory={clearHistory}
         />
 
@@ -153,7 +170,7 @@ const AiAgentPage = () => {
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 mb-2">Ask anything about your dashboard</h3>
                 <p className="text-sm text-slate-500 max-w-sm mb-6">
-                  Ask about inquiries, earnings, sticker usage, and other operational data.
+                  Start a new conversation and ask about inquiries, earnings, sticker usage, and other operational data.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl">
                   {QUICK_ACTIONS.map((action) => (
@@ -169,7 +186,7 @@ const AiAgentPage = () => {
               </div>
             ) : (
               messages.map((msg, idx) => (
-                <div key={idx} id={msg.id ? `msg-${msg.id}` : undefined}>
+                <div key={msg.id || idx}>
                   <ChatMessage
                     role={msg.role}
                     message={msg.message || msg.content}

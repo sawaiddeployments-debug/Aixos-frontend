@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { AuthContext } from '../context/AuthContext';
 import { Mail, Lock, AlertCircle, ArrowLeft } from 'lucide-react';
 
 const LoginPage = () => {
     const { role } = useParams();
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const auth = useContext(AuthContext);
+    const login = auth?.login;
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -32,10 +33,36 @@ const LoginPage = () => {
     const getRoleData = () => {
         if (role === 'agent') return { title: 'Agent Portal', sub: 'Log visits and track earnings', bg: 'bg-red-600' };
         if (role === 'customer') return { title: 'Client Portal', sub: 'Manage your safety compliance', bg: 'bg-slate-900' };
+        if (role === 'partner') return { title: 'Partner Portal', sub: 'Manage inquiries and delivery coordination', bg: 'bg-slate-800' };
         return { title: 'Admin Console', sub: 'Platform management', bg: 'bg-slate-800' };
     };
 
     const { title, sub, bg } = getRoleData();
+
+    if (!login) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+                <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-soft border border-slate-100 text-center">
+                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Session not ready</h2>
+                    <p className="text-slate-600 mb-6">
+                        The login context is still initializing. Please refresh this page to continue.
+                    </p>
+                    <div className="flex gap-3 justify-center">
+                        <button
+                            type="button"
+                            onClick={() => window.location.reload()}
+                            className="btn-primary"
+                        >
+                            Reload
+                        </button>
+                        <Link to="/" className="btn-outline">
+                            Back Home
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex bg-white">
