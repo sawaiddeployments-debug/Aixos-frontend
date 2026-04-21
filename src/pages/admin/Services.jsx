@@ -32,7 +32,7 @@ const AdminServices = () => {
             const { data: agentsData, error: aError } = await supabase
                 .from('agents')
                 .select('id, name, territory')
-                .eq('status', 'Active');
+                .or('status.ilike.accepted,status.ilike.active');
 
             if (aError) throw aError;
 

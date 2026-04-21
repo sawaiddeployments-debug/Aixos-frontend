@@ -49,7 +49,8 @@ const GlobalMap = () => {
             try {
                 const { data: agentsData } = await supabase
                     .from('agents')
-                    .select('id, name, territory, location_lat, location_lng');
+                    .select('id, name, territory, location_lat, location_lng')
+                    .or('status.ilike.accepted,status.ilike.active');
                 const { data: customersData } = await supabase
                     .from('customers')
                     .select('id, business_name, address, location_lat, location_lng');

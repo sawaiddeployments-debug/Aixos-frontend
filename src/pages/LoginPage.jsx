@@ -21,6 +21,7 @@ const LoginPage = () => {
         const result = await login(email, password, role);
 
         if (result.success) {
+            setLoading(false);
             navigate(`/${role}/dashboard`);
         } else {
             setError(result.error);

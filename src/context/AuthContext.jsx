@@ -1,21 +1,55 @@
+/* eslint-disable react-refresh/only-export-components -- context exports Provider and useAuth */
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { API_URL } from '../api/client';
+import { AGENT_STATUS, agentLoginBlockedMessage, fetchAgentApprovalStatus } from '../constants/agentApprovalStatus';
 
-const AuthContext = createContext();
-export const useAuth = () => useContext(AuthContext);
+const AuthContext = createContext(undefined);
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an <AuthProvider>');
+  }
+  return context;
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user from localStorage
+  const clearSession = () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('role');
+    localStorage.removeItem('token');
+    setUser(null);
+  };
+
+  // Load user from localStorage; block agent sessions when not accepted
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const storedRole = localStorage.getItem('role');
-    if (storedUser && storedRole) {
-      setUser({ ...JSON.parse(storedUser), role: storedRole });
-    }
-    setLoading(false);
+    const init = async () => {
+      try {
+        const storedUser = localStorage.getItem('user');
+        const storedRole = localStorage.getItem('role');
+        if (storedUser && storedRole) {
+          const parsed = JSON.parse(storedUser);
+          if (storedRole === 'agent') {
+            const status = await fetchAgentApprovalStatus({ id: parsed.id, email: parsed.email });
+            const s = (status || '').toLowerCase();
+            if (s !== AGENT_STATUS.ACCEPTED && s !== 'active') {
+              clearSession();
+              return;
+            }
+          }
+          setUser({ ...parsed, role: storedRole });
+        }
+      } catch (err) {
+        console.error('AuthProvider init failed:', err);
+        clearSession();
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
   }, []);
 
   // LOGIN
@@ -32,7 +66,25 @@ export const AuthProvider = ({ children }) => {
       const result = await response.json();
 
       if (!response.ok) {
+        if (role === 'agent') {
+          const status = await fetchAgentApprovalStatus({ email });
+          const s = (status || '').toLowerCase();
+          if (s && s !== AGENT_STATUS.ACCEPTED && s !== 'active') {
+            return { success: false, error: agentLoginBlockedMessage(status) };
+          }
+        }
         return { success: false, error: result.error || 'Invalid credentials' };
+      }
+
+      if (role === 'agent') {
+        const status = await fetchAgentApprovalStatus({ id: result.user?.id, email });
+        const s = (status || '').toLowerCase();
+        if (s !== AGENT_STATUS.ACCEPTED && s !== 'active') {
+          return {
+            success: false,
+            error: agentLoginBlockedMessage(status),
+          };
+        }
       }
 
       // Save user and role in localStorage
@@ -94,10 +146,7 @@ export const AuthProvider = ({ children }) => {
 
   // LOGOUT
   const logout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('role');
-    localStorage.removeItem('token');
-    setUser(null);
+    clearSession();
   };
 
   return (

@@ -35,6 +35,13 @@ export interface Partner {
     created_at: string;
 }
 
+/** Field agent approval (admin Agents page + login gate). */
+export interface Agent {
+    id: string;
+    email: string | null;
+    status: 'pending' | 'accepted' | 'rejected' | 'hold';
+}
+
 export interface Customer {
     id: number;
     business_name: string;

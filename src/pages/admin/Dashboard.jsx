@@ -32,7 +32,7 @@ const AdminDashboard = () => {
             try {
                 // Fetch stats from Supabase
                 const { count: totalAgents } = await supabase.from('agents').select('*', { count: 'exact', head: true });
-                const { count: pendingAgents } = await supabase.from('agents').select('*', { count: 'exact', head: true }).eq('status', 'Pending');
+                const { count: pendingAgents } = await supabase.from('agents').select('*', { count: 'exact', head: true }).ilike('status', 'pending');
                 const { count: totalCustomers } = await supabase.from('customers').select('*', { count: 'exact', head: true });
                 const { data: servicesData, error: sError } = await supabase
                     .from('services')

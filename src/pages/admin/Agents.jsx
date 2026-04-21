@@ -1,57 +1,115 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../supabaseClient';
-import { Check, X, User, Phone, MapPin, FileText, Shield } from 'lucide-react';
+import { Check, X, User, Phone, MapPin, FileText, Shield, Pause } from 'lucide-react';
 import PageLoader from '../../components/PageLoader';
+import { AGENT_STATUS } from '../../constants/agentApprovalStatus';
+
+const TABS = [
+    { value: AGENT_STATUS.PENDING, label: 'Pending' },
+    { value: AGENT_STATUS.ACCEPTED, label: 'Active' },
+    { value: AGENT_STATUS.REJECTED, label: 'Rejected' },
+    { value: AGENT_STATUS.HOLD, label: 'Hold' },
+];
+
+function normalizeStatus(raw) {
+    const s = (raw || '').toLowerCase();
+    if (s === 'active') return AGENT_STATUS.ACCEPTED;
+    if (s === 'suspended') return AGENT_STATUS.REJECTED;
+    if (Object.values(AGENT_STATUS).includes(s)) return s;
+    return AGENT_STATUS.PENDING;
+}
+
+function statusBadgeClasses(status) {
+    const s = normalizeStatus(status);
+    if (s === AGENT_STATUS.ACCEPTED) return 'bg-green-100 text-green-700';
+    if (s === AGENT_STATUS.REJECTED) return 'bg-red-100 text-red-700';
+    if (s === AGENT_STATUS.HOLD) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-slate-100 text-slate-600';
+}
+
+function statusLabel(status) {
+    const s = normalizeStatus(status);
+    if (s === AGENT_STATUS.ACCEPTED) return 'Accepted';
+    if (s === AGENT_STATUS.REJECTED) return 'Rejected';
+    if (s === AGENT_STATUS.HOLD) return 'Hold';
+    if (s === AGENT_STATUS.PENDING) return 'Pending';
+    return status || 'Unknown';
+}
 
 const AgentManagement = () => {
     const [agents, setAgents] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('Pending');
+    const [activeTab, setActiveTab] = useState(AGENT_STATUS.PENDING);
 
-    const fetchAgents = async () => {
+    const fetchAgents = useCallback(async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('agents')
-                .select('*')
-                .eq('status', activeTab)
-                .order('created_at', { ascending: false });
+            const LEGACY_MAP = {
+                [AGENT_STATUS.ACCEPTED]: 'active',
+                [AGENT_STATUS.REJECTED]: 'suspended',
+            };
+            const legacy = LEGACY_MAP[activeTab];
+            let query = supabase.from('agents').select('*');
 
+            if (legacy) {
+                query = query.or(`status.ilike.${activeTab},status.ilike.${legacy}`);
+            } else {
+                query = query.ilike('status', activeTab);
+            }
+
+            const { data, error } = await query.order('created_at', { ascending: false });
+
+            console.log('fetchAgents tab:', activeTab, 'data:', data, 'error:', error);
             if (error) throw error;
             setAgents(data || []);
         } catch (err) {
-            console.error(err);
+            console.error('fetchAgents error:', err);
         } finally {
             setLoading(false);
         }
-    };
+    }, [activeTab]);
 
     useEffect(() => {
         fetchAgents();
-    }, [activeTab]);
+    }, [fetchAgents]);
 
-    const handleAction = async (id, action) => {
-        const newStatus = action === 'approve' ? 'Active' : 'Suspended';
-        if (!window.confirm(`Are you sure you want to ${action} this agent?`)) return;
+    /**
+     * Equivalent to PATCH /agents/:id/status — implemented via Supabase.
+     */
+    const setAgentStatus = async (id, nextStatus, { confirmReject = true } = {}) => {
+        if (nextStatus === AGENT_STATUS.HOLD) {
+            if (!window.confirm('Are you sure you want to HOLD this agent?')) return;
+        } else if (nextStatus === AGENT_STATUS.REJECTED && confirmReject) {
+            if (!window.confirm('Are you sure you want to reject this agent?')) return;
+        }
+
+        console.log(id, nextStatus);
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('agents')
-                .update({ status: newStatus })
-                .eq('id', id);
+                .update({ status: nextStatus })
+                .eq('id', id)
+                .select()
+                .maybeSingle();
 
             if (error) throw error;
-            fetchAgents(); // Refresh list
+            if (!data) {
+                console.warn('No row updated — check id and RLS policies for agents');
+                alert('Update failed: no row returned. Check agent id and database permissions.');
+                return;
+            }
+            await fetchAgents();
         } catch (err) {
-            alert(`Failed to ${action} agent: ` + err.message);
+            console.error('setAgentStatus', err);
+            alert(`Failed to update agent: ${err.message || err}`);
         }
     };
 
     const getImageUrl = (filename) => {
-        // Since backend is gone, local uploads won't work.
-        // In a real app, you'd use Supabase Storage.
-        // This is a placeholder for the user to migrate their files to Supabase Storage.
         return filename;
     };
+
+    const tabLabel = (value) => TABS.find((t) => t.value === value)?.label ?? value;
 
     return (
         <div className="relative min-h-[400px] space-y-6">
@@ -61,14 +119,16 @@ const AgentManagement = () => {
                     <h1 className="text-3xl font-display font-bold text-slate-900">Agent Management</h1>
                     <p className="text-slate-500">Approve new applications and manage existing agents.</p>
                 </div>
-                <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
-                    {['Pending', 'Active', 'Suspended'].map(tab => (
+                <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm flex-wrap gap-1">
+                    {TABS.map((tab) => (
                         <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'}`}
+                            key={tab.value}
+                            type="button"
+                            onClick={() => setActiveTab(tab.value)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab.value ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'
+                                }`}
                         >
-                            {tab}
+                            {tab.label}
                         </button>
                     ))}
                 </div>
@@ -77,14 +137,13 @@ const AgentManagement = () => {
             {!loading && agents.length === 0 ? (
                 <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-soft">
                     <Shield size={48} className="mx-auto text-slate-200 mb-4" />
-                    <h3 className="text-xl font-bold text-slate-900">No {activeTab} Agents</h3>
+                    <h3 className="text-xl font-bold text-slate-900">No {tabLabel(activeTab)} Agents</h3>
                     <p className="text-slate-500">There are currently no agents in this category.</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-6">
-                    {agents.map(agent => (
+                    {agents.map((agent) => (
                         <div key={agent.id} className="bg-white rounded-3xl p-6 shadow-soft border border-slate-100 flex flex-col md:flex-row gap-6 items-start animate-fade-in group hover:shadow-lg transition-all">
-                            {/* Profile Photo */}
                             <div className="w-24 h-24 rounded-2xl bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-200">
                                 {agent.profile_photo ? (
                                     <img src={getImageUrl(agent.profile_photo)} alt={agent.name} className="w-full h-full object-cover" />
@@ -101,10 +160,8 @@ const AgentManagement = () => {
                                         <h3 className="text-xl font-bold text-slate-900">{agent.name}</h3>
                                         <p className="text-sm text-slate-500">{agent.email}</p>
                                     </div>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${agent.status === 'Active' ? 'bg-green-100 text-green-700' :
-                                        agent.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                                        }`}>
-                                        {agent.status}
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusBadgeClasses(agent.status)}`}>
+                                        {statusLabel(agent.status)}
                                     </span>
                                 </div>
 
@@ -117,7 +174,6 @@ const AgentManagement = () => {
                                         <MapPin size={16} className="text-slate-400" />
                                         {agent.territory || 'Unassigned'}
                                     </div>
-                                    {/* Documents Preview Link */}
                                     {agent.residential_letter ? (
                                         <div className="flex items-center gap-2 mt-2">
                                             <a
@@ -133,27 +189,45 @@ const AgentManagement = () => {
                                         <div className="text-sm text-slate-500 mt-2">Residential Letter: N/A</div>
                                     )}
                                 </div>
-
-
                             </div>
 
-                            {/* Actions */}
-                            {activeTab === 'Pending' && (
-                                <div className="flex flex-row md:flex-col gap-2 w-full md:w-auto mt-4 md:mt-0">
-                                    <button
-                                        onClick={() => handleAction(agent.id, 'approve')}
-                                        className="btn-primary py-2 px-4 shadow-none bg-green-500 hover:bg-green-600 text-sm flex items-center justify-center gap-2"
-                                    >
-                                        <Check size={16} /> Approve
-                                    </button>
-                                    <button
-                                        onClick={() => handleAction(agent.id, 'reject')}
-                                        className="py-2 px-4 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 rounded-xl text-slate-600 font-medium text-sm flex items-center justify-center gap-2 transition-all"
-                                    >
-                                        <X size={16} /> Reject
-                                    </button>
-                                </div>
-                            )}
+                            {(() => {
+                                const norm = normalizeStatus(agent.status);
+                                const showAccept = norm !== AGENT_STATUS.ACCEPTED;
+                                const showReject = norm !== AGENT_STATUS.REJECTED;
+                                const showHold = norm !== AGENT_STATUS.HOLD;
+                                return (
+                                    <div className="flex flex-row flex-wrap md:flex-col gap-2 w-full md:w-auto mt-4 md:mt-0">
+                                        {showAccept && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setAgentStatus(agent.id, AGENT_STATUS.ACCEPTED, { confirmReject: false })}
+                                                className="btn-primary py-2 px-4 shadow-none bg-green-500 hover:bg-green-600 text-sm flex items-center justify-center gap-2"
+                                            >
+                                                <Check size={16} /> Accept
+                                            </button>
+                                        )}
+                                        {showReject && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setAgentStatus(agent.id, AGENT_STATUS.REJECTED)}
+                                                className="py-2 px-4 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 rounded-xl text-slate-600 font-medium text-sm flex items-center justify-center gap-2 transition-all"
+                                            >
+                                                <X size={16} /> Reject
+                                            </button>
+                                        )}
+                                        {showHold && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setAgentStatus(agent.id, AGENT_STATUS.HOLD, { confirmReject: false })}
+                                                className="py-2 px-4 border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-all"
+                                            >
+                                                <Pause size={16} /> Hold
+                                            </button>
+                                        )}
+                                    </div>
+                                );
+                            })()}
                         </div>
                     ))}
                 </div>
