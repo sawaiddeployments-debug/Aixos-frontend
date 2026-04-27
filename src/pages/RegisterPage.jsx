@@ -1,19 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { AlertCircle, ArrowLeft, Upload, FileText, CheckSquare } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Upload, Eye, EyeOff } from 'lucide-react';
+import PhoneInput from 'react-phone-input-2';
+import 'react-phone-input-2/lib/style.css';
 
 const RegisterPage = () => {
     const { role } = useParams();
     const navigate = useNavigate();
     const { register } = useAuth();
 
-    // Form Data State
     const [formData, setFormData] = useState({
         name: '',
         email: '',
         password: '',
-        phoneLocal: '',
         territory: 'North Zone',
         business_name: '',
         owner_name: '',
@@ -22,11 +22,9 @@ const RegisterPage = () => {
         terms_accepted: false
     });
 
+    const [phone, setPhone] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
 
-    const [countryCode, setCountryCode] = useState('+92'); // Default fallback
-    const [loadingIp, setLoadingIp] = useState(true);
-
-    // Separate state for files
     const [files, setFiles] = useState({
         profile_photo: null,
         residential_letter: null,
@@ -35,19 +33,6 @@ const RegisterPage = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        // Detect IP and Country Code
-        fetch('https://ipwho.is/')
-            .then(res => res.json())
-            .then(data => {
-                if (data.success && data.calling_code) {
-                    setCountryCode('+' + data.calling_code);
-                }
-            })
-            .catch(err => console.error("IP Detect Error", err))
-            .finally(() => setLoadingIp(false));
-    }, []);
-
     const handleChange = (e) => {
         const { name, value, type, checked, files: fileInput } = e.target;
 
@@ -55,10 +40,6 @@ const RegisterPage = () => {
             setFiles(prev => ({ ...prev, [name]: fileInput[0] }));
         } else if (type === 'checkbox') {
             setFormData(prev => ({ ...prev, [name]: checked }));
-        } else if (name === 'phoneLocal') {
-            // Enforce 9 digits only
-            const cleaned = value.replace(/\D/g, '').slice(0, 9);
-            setFormData(prev => ({ ...prev, [name]: cleaned }));
         } else {
             setFormData(prev => ({ ...prev, [name]: value }));
         }
@@ -70,20 +51,15 @@ const RegisterPage = () => {
         setLoading(true);
 
         try {
-            let dataToSend;
+            const fullPhone = phone.startsWith('+') ? phone : `+${phone}`;
 
-            // Combine Phone
-            const fullPhone = `${countryCode}${formData.phoneLocal}`;
-
-            // Construct Base Data
             const baseData = {
                 ...formData,
                 phone: fullPhone
             };
 
-            delete baseData.phoneLocal; // Remove temp field
-
             const isAgent = role === 'agent';
+            let dataToSend;
 
             if (isAgent) {
                 const formDataObj = new FormData();
@@ -92,13 +68,12 @@ const RegisterPage = () => {
                 });
 
                 if (files.profile_photo) formDataObj.append('profile_photo', files.profile_photo);
-                if (files.residential_letter) formDataObj.append('residential_letter', files.residential_letter); // new
+                if (files.residential_letter) formDataObj.append('residential_letter', files.residential_letter);
 
                 dataToSend = formDataObj;
             } else {
                 dataToSend = baseData;
             }
-
 
             const result = await register(role, dataToSend);
             if (result.success) {
@@ -171,25 +146,23 @@ const RegisterPage = () => {
                                     </div>
 
                                     <Input label="Email" name="email" type="email" value={formData.email} onChange={handleChange} placeholder="Optional (for login)" />
-                                    <Input label="Password" name="password" type="password" value={formData.password} onChange={handleChange} required />
+                                    <PasswordInput label="Password" name="password" value={formData.password} onChange={handleChange} showPassword={showPassword} onToggle={() => setShowPassword(p => !p)} required />
 
                                     <div className="grid grid-cols-2 gap-4">
-                                        {/* Phone Input Custom */}
                                         <div className="col-span-1">
                                             <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
-                                            <div className="flex rounded-xl border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-primary-500/20 focus-within:border-primary-500">
-                                                <div className="bg-slate-50 px-3 py-3 text-slate-500 border-r border-slate-200 font-medium select-none min-w-[3.5rem] flex items-center justify-center">
-                                                    {loadingIp ? '...' : countryCode}
-                                                </div>
-                                                <input
-                                                    name="phoneLocal"
-                                                    value={formData.phoneLocal}
-                                                    onChange={handleChange}
-                                                    className="flex-1 px-4 py-3 outline-none min-w-0"
-                                                    placeholder="3XX XXXXXXX"
-                                                    required
-                                                />
-                                            </div>
+                                            <PhoneInput
+                                                country={'sa'}
+                                                enableSearch
+                                                value={phone}
+                                                onChange={setPhone}
+                                                inputClass="!w-full !h-[46px] !rounded-xl !border-slate-200 !pl-14 !text-sm !font-medium focus:!border-primary-500 focus:!ring-2 focus:!ring-primary-500/20"
+                                                buttonClass="!rounded-l-xl !border-slate-200 !bg-slate-50 !h-[46px]"
+                                                containerClass="!w-full"
+                                                searchClass="!rounded-lg !border-slate-200"
+                                                dropdownClass="!rounded-xl !border-slate-200 !shadow-lg"
+                                                inputProps={{ required: true }}
+                                            />
                                         </div>
                                         <div className="col-span-1">
                                             <label className="block text-sm font-medium text-slate-700 mb-1">Residential Letter</label>
@@ -210,7 +183,6 @@ const RegisterPage = () => {
                                             </div>
                                         </div>
                                     </div>
-
 
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Territory Preference</label>
@@ -247,24 +219,22 @@ const RegisterPage = () => {
                                     <Input label="Business Name" name="business_name" value={formData.business_name} onChange={handleChange} required />
                                     <Input label="Owner Name" name="owner_name" value={formData.owner_name} onChange={handleChange} />
                                     <Input label="Email" name="email" type="email" value={formData.email} onChange={handleChange} required />
-                                    <Input label="Password" name="password" type="password" value={formData.password} onChange={handleChange} required />
+                                    <PasswordInput label="Password" name="password" value={formData.password} onChange={handleChange} showPassword={showPassword} onToggle={() => setShowPassword(p => !p)} required />
 
-                                    {/* Phone Input Custom Partner */}
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
-                                        <div className="flex rounded-xl border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-primary-500/20 focus-within:border-primary-500">
-                                            <div className="bg-slate-50 px-3 py-3 text-slate-500 border-r border-slate-200 font-medium select-none min-w-[3.5rem] flex items-center justify-center">
-                                                {loadingIp ? '...' : countryCode}
-                                            </div>
-                                            <input
-                                                name="phoneLocal"
-                                                value={formData.phoneLocal}
-                                                onChange={handleChange}
-                                                className="flex-1 px-4 py-3 outline-none min-w-0"
-                                                placeholder="3XX XXXXXXX"
-                                                required
-                                            />
-                                        </div>
+                                        <PhoneInput
+                                            country={'sa'}
+                                            enableSearch
+                                            value={phone}
+                                            onChange={setPhone}
+                                            inputClass="!w-full !h-[46px] !rounded-xl !border-slate-200 !pl-14 !text-sm !font-medium focus:!border-primary-500 focus:!ring-2 focus:!ring-primary-500/20"
+                                            buttonClass="!rounded-l-xl !border-slate-200 !bg-slate-50 !h-[46px]"
+                                            containerClass="!w-full"
+                                            searchClass="!rounded-lg !border-slate-200"
+                                            dropdownClass="!rounded-xl !border-slate-200 !shadow-lg"
+                                            inputProps={{ required: true }}
+                                        />
                                     </div>
 
                                     <Input label="Address" name="address" value={formData.address} onChange={handleChange} />
@@ -274,24 +244,22 @@ const RegisterPage = () => {
                                     <Input label="Business Name" name="business_name" value={formData.business_name} onChange={handleChange} required />
                                     <Input label="Owner Name" name="owner_name" value={formData.owner_name} onChange={handleChange} />
                                     <Input label="Email" name="email" type="email" value={formData.email} onChange={handleChange} placeholder="Optional for now" />
-                                    <Input label="Password" name="password" type="password" value={formData.password} onChange={handleChange} required />
+                                    <PasswordInput label="Password" name="password" value={formData.password} onChange={handleChange} showPassword={showPassword} onToggle={() => setShowPassword(p => !p)} required />
 
-                                    {/* Phone Input Custom Customer */}
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
-                                        <div className="flex rounded-xl border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-primary-500/20 focus-within:border-primary-500">
-                                            <div className="bg-slate-50 px-3 py-3 text-slate-500 border-r border-slate-200 font-medium select-none min-w-[3.5rem] flex items-center justify-center">
-                                                {loadingIp ? '...' : countryCode}
-                                            </div>
-                                            <input
-                                                name="phoneLocal"
-                                                value={formData.phoneLocal}
-                                                onChange={handleChange}
-                                                className="flex-1 px-4 py-3 outline-none min-w-0"
-                                                placeholder="3XX XXXXXXX"
-                                                required
-                                            />
-                                        </div>
+                                        <PhoneInput
+                                            country={'sa'}
+                                            enableSearch
+                                            value={phone}
+                                            onChange={setPhone}
+                                            inputClass="!w-full !h-[46px] !rounded-xl !border-slate-200 !pl-14 !text-sm !font-medium focus:!border-primary-500 focus:!ring-2 focus:!ring-primary-500/20"
+                                            buttonClass="!rounded-l-xl !border-slate-200 !bg-slate-50 !h-[46px]"
+                                            containerClass="!w-full"
+                                            searchClass="!rounded-lg !border-slate-200"
+                                            dropdownClass="!rounded-xl !border-slate-200 !shadow-lg"
+                                            inputProps={{ required: true }}
+                                        />
                                     </div>
 
                                     <Input label="Address" name="address" value={formData.address} onChange={handleChange} />
@@ -331,6 +299,31 @@ const Input = ({ label, name, type = "text", value, onChange, placeholder, requi
     <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
         <input name={name} type={type} required={required} value={value} onChange={onChange} className="input-field" placeholder={placeholder || `Enter ${label}`} />
+    </div>
+);
+
+const PasswordInput = ({ label, name, value, onChange, showPassword, onToggle, required = false }) => (
+    <div>
+        <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+        <div className="relative">
+            <input
+                name={name}
+                type={showPassword ? 'text' : 'password'}
+                required={required}
+                value={value}
+                onChange={onChange}
+                className="input-field pr-11"
+                placeholder="••••••••"
+            />
+            <button
+                type="button"
+                onClick={onToggle}
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                tabIndex={-1}
+            >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+        </div>
     </div>
 );
 

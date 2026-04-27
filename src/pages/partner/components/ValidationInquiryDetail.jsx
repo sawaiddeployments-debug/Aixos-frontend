@@ -1,5 +1,6 @@
 import React from 'react';
 import { FileText, Calendar, MapPin, Tag, User, MessageCircle, Hash } from 'lucide-react';
+import CustomerContactSection from './CustomerContactSection';
 
 const ValidationInquiryDetail = ({ viewModel }) => {
     const {
@@ -12,7 +13,13 @@ const ValidationInquiryDetail = ({ viewModel }) => {
         agentNotes,
         status,
         utilizationRows,
-        customerEmail
+        customerEmail,
+        customerPhone,
+        customerOwnerName,
+        customerId,
+        customerAddress,
+        customerLocationLat,
+        customerLocationLng,
     } = viewModel;
 
     const mailHref = customerEmail ? `mailto:${customerEmail}` : null;
@@ -62,6 +69,19 @@ const ValidationInquiryDetail = ({ viewModel }) => {
                         </p>
                     </div>
                 </div>
+            </div>
+
+            {/* Customer Contact */}
+            <div className="px-6 md:px-8 lg:px-10 pt-6 md:pt-8">
+                <CustomerContactSection
+                    ownerName={customerOwnerName}
+                    email={customerEmail}
+                    phone={customerPhone}
+                    customerId={customerId}
+                    address={customerAddress}
+                    locationLat={customerLocationLat}
+                    locationLng={customerLocationLng}
+                />
             </div>
 
             {/* Main Content */}

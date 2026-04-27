@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
     ChevronLeft,
@@ -16,8 +16,12 @@ import {
     Mic,
     Edit2,
     CheckCircle,
-    XCircle
+    XCircle,
+    ExternalLink,
+    Download
 } from 'lucide-react';
+import pdfMake from 'pdfmake/build/pdfmake';
+import pdfFonts from 'pdfmake/build/vfs_fonts';
 import { getInquiryById, updateInquiryStatus } from '../../api/partners';
 import NewUnitDetailModal from './components/NewUnitDetailModal';
 import {
@@ -25,6 +29,11 @@ import {
     fetchSiteAssessmentByInquiryId,
     fetchInspectionReportsByInquiryId
 } from '../../api/maintenanceApi';
+
+const pdfVfs = pdfFonts?.pdfMake?.vfs || pdfFonts?.vfs;
+if (pdfVfs && !pdfMake.vfs) {
+    pdfMake.vfs = pdfVfs;
+}
 import ChatModal from '../../components/Chat/ChatModal';
 import PartnerPostAcceptCard from './components/PartnerPostAcceptCard';
 import ScheduleDateModal from './components/ScheduleDateModal';
@@ -82,8 +91,9 @@ const DetailField = ({ label, value, className = '' }) => (
     </div>
 );
 
-const MediaLink = ({ href, label, icon: Icon, isAudio = false }) => {
+const MediaLink = ({ href, label, icon, isAudio = false }) => {
     if (!href) return null;
+    const Icon = icon;
     if (isAudio) {
         return (
             <div className="flex flex-col gap-2 min-w-[200px]">
@@ -183,7 +193,7 @@ const InquiryItemDetailPage = () => {
     const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
     const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
 
-    const loadInquiry = async ({ showPageLoader = true } = {}) => {
+    const loadInquiry = useCallback(async ({ showPageLoader = true } = {}) => {
         if (showPageLoader) setLoading(true);
         try {
             const data = await getInquiryById(inquiryId);
@@ -196,11 +206,11 @@ const InquiryItemDetailPage = () => {
         } finally {
             if (showPageLoader) setLoading(false);
         }
-    };
+    }, [inquiryId]);
 
     useEffect(() => {
         loadInquiry({ showPageLoader: true });
-    }, [inquiryId]);
+    }, [loadInquiry]);
 
     useEffect(() => {
         if (!inquiryId || !inquiry) {
@@ -277,7 +287,7 @@ const InquiryItemDetailPage = () => {
             }
             toast.success(`Inquiry ${newStatus} successfully`);
             await loadInquiry({ showPageLoader: false });
-        } catch (err) {
+        } catch {
             toast.error(`Failed to ${newStatus} inquiry`);
         } finally {
             setActionLoading(false);
@@ -352,11 +362,173 @@ const InquiryItemDetailPage = () => {
         (issueParts.length ? issueParts.join(' · ') : null) ||
         'No issue notes for this line item.';
 
-    const itemServices = Array.isArray(item.inquiry_item_services) ? item.inquiry_item_services : [];
     const isInquiryPending = (inquiry.status || '').toLowerCase() === 'pending';
     const isMaintenanceInquiry =
         (inquiry.type || inquiry.inquiry_type || '').toString().trim().toLowerCase() === 'maintenance';
     const isInquiryAccepted = (inquiry.status || '').toLowerCase() === 'accepted';
+    const canGenerateServiceReport =
+        (inquiry.status || '').toLowerCase() === 'completed' || inquiry.service_confirmed === true;
+
+    const formatCurrency = (value) => {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return 'SAR 0.00';
+        return `SAR ${numeric.toFixed(2)}`;
+    };
+
+    const generateServiceReport = () => {
+        if (!canGenerateServiceReport) return;
+
+        try {
+            const inquiryItems = Array.isArray(inquiry.inquiry_items) ? inquiry.inquiry_items : [];
+            const itemRows = inquiryItems.length
+                ? inquiryItems.map((row) => ([
+                    formatVal(row.type || row.system || 'Service Item'),
+                    formatVal(row.capacity || row.unit || '—'),
+                    formatVal(row.quantity ?? 1),
+                    formatCurrency(row.price)
+                ]))
+                : [['No items', '—', '—', '—']];
+
+            const content = [
+                {
+                    text: 'Service Report',
+                    style: 'reportTitle',
+                    margin: [0, 0, 0, 18]
+                },
+                {
+                    text: 'Inquiry Details',
+                    style: 'sectionHeading'
+                },
+                {
+                    columns: [
+                        [
+                            { text: `Inquiry ID: ${formatVal(inquiry.id || inquiryId)}`, style: 'metaText' },
+                            { text: `Inquiry Type: ${formatVal(inquiryType)}`, style: 'metaText' }
+                        ],
+                        [
+                            { text: `Date: ${formatDateTime(inquiry.created_at)}`, style: 'metaText' },
+                            { text: `Status: ${formatVal(displayStatus)}`, style: 'metaText' }
+                        ]
+                    ],
+                    columnGap: 20,
+                    margin: [0, 0, 0, 14]
+                },
+                {
+                    text: 'Customer Details',
+                    style: 'sectionHeading'
+                },
+                {
+                    columns: [
+                        [
+                            { text: `Name: ${formatVal(customer.owner_name || businessName)}`, style: 'metaText' },
+                            { text: `Email: ${formatVal(customer.email)}`, style: 'metaText' }
+                        ],
+                        [
+                            { text: `Phone: ${formatVal(customer.phone)}`, style: 'metaText' },
+                            { text: `Address: ${formatVal(customer.address)}`, style: 'metaText' }
+                        ]
+                    ],
+                    columnGap: 20,
+                    margin: [0, 0, 0, 14]
+                },
+                {
+                    text: 'Service Details',
+                    style: 'sectionHeading'
+                },
+                {
+                    columns: [
+                        [
+                            { text: `Service Type: ${formatVal(inquiryType)}`, style: 'metaText' },
+                            { text: `Priority: ${formatVal(priority)}`, style: 'metaText' }
+                        ],
+                        [
+                            { text: `Line Item: ${formatVal(extinguisherLabel(item))}`, style: 'metaText' },
+                            { text: `Notes / Issue: ${formatVal(issueText)}`, style: 'metaText' }
+                        ]
+                    ],
+                    columnGap: 20,
+                    margin: [0, 0, 0, 16]
+                },
+                {
+                    text: 'Line Items',
+                    style: 'sectionHeading'
+                },
+                {
+                    table: {
+                        headerRows: 1,
+                        widths: ['*', 'auto', 'auto', 'auto'],
+                        body: [
+                            [
+                                { text: 'Product', style: 'tableHeader' },
+                                { text: 'Capacity', style: 'tableHeader' },
+                                { text: 'Quantity', style: 'tableHeader' },
+                                { text: 'Price', style: 'tableHeader' }
+                            ],
+                            ...itemRows
+                        ]
+                    },
+                    layout: {
+                        fillColor: (rowIndex) => (rowIndex === 0 ? '#F8FAFC' : null),
+                        hLineColor: () => '#CBD5E1',
+                        vLineColor: () => '#CBD5E1',
+                        hLineWidth: () => 1,
+                        vLineWidth: () => 1,
+                        paddingLeft: () => 8,
+                        paddingRight: () => 8,
+                        paddingTop: () => 6,
+                        paddingBottom: () => 6
+                    },
+                    margin: [0, 0, 0, 26]
+                },
+                {
+                    text: 'Services marketed by Aixos',
+                    alignment: 'center',
+                    color: '#DC2626',
+                    bold: true,
+                    fontSize: 12,
+                    margin: [0, 20, 0, 0]
+                }
+            ];
+
+            const docDefinition = {
+                pageSize: 'A4',
+                pageMargins: [32, 36, 32, 36],
+                content,
+                defaultStyle: {
+                    fontSize: 10,
+                    color: '#0F172A'
+                },
+                styles: {
+                    reportTitle: {
+                        fontSize: 22,
+                        bold: true,
+                        color: '#0F172A'
+                    },
+                    sectionHeading: {
+                        fontSize: 12,
+                        bold: true,
+                        color: '#1E293B',
+                        margin: [0, 8, 0, 8]
+                    },
+                    metaText: {
+                        fontSize: 10,
+                        lineHeight: 1.4,
+                        margin: [0, 2, 0, 2]
+                    },
+                    tableHeader: {
+                        bold: true,
+                        color: '#0F172A',
+                        fontSize: 10
+                    }
+                }
+            };
+
+            pdfMake.createPdf(docDefinition).download(`service-report-${inquiryId}.pdf`);
+        } catch (err) {
+            console.error('Failed generating service report:', err);
+            toast.error('Could not generate service report');
+        }
+    };
 
     return (
         <div className="min-h-screen pb-20 animate-in fade-in duration-500">
@@ -416,6 +588,16 @@ const InquiryItemDetailPage = () => {
                                     <MapPin size={18} className="text-slate-400 shrink-0" />
                                     {address}
                                 </p>
+                                {canGenerateServiceReport && (
+                                    <button
+                                        type="button"
+                                        onClick={generateServiceReport}
+                                        className="inline-flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-600 text-white text-sm font-bold px-6 py-3 rounded-2xl shadow-lg transition-all w-full sm:w-auto"
+                                    >
+                                        <Download size={18} />
+                                        Generate Service Report
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     onClick={openChat}
@@ -455,6 +637,35 @@ const InquiryItemDetailPage = () => {
                                 ) : '—'}
                             />
                             <DetailField label="Customer ID" value={formatVal(customer.id ?? inquiry.customer_id)} />
+                            <DetailField
+                                label="Location"
+                                className="sm:col-span-2"
+                                value={(() => {
+                                    const hasCoords = customer.location_lat != null && customer.location_lng != null;
+                                    const hasAddr = customer.address && customer.address.trim();
+                                    const mapUrl = hasCoords
+                                        ? `https://www.google.com/maps?q=${customer.location_lat},${customer.location_lng}`
+                                        : hasAddr
+                                            ? `https://www.google.com/maps?q=${encodeURIComponent(customer.address)}`
+                                            : null;
+                                    return (
+                                        <span className="flex items-center gap-3 flex-wrap">
+                                            <span>{hasAddr ? customer.address : hasCoords ? `${customer.location_lat}, ${customer.location_lng}` : '—'}</span>
+                                            {mapUrl && (
+                                                <a
+                                                    href={mapUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-600 hover:bg-primary-100 rounded-lg text-xs font-bold transition-colors shrink-0"
+                                                >
+                                                    <ExternalLink size={12} />
+                                                    Open in Maps
+                                                </a>
+                                            )}
+                                        </span>
+                                    );
+                                })()}
+                            />
                         </div>
                     </div>
 

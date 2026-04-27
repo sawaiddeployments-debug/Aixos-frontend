@@ -14,6 +14,7 @@ import VisitForm from './pages/agent/VisitForm';
 import Customers from './pages/agent/Customers';
 import CustomerDetails from './pages/agent/CustomerDetails';
 import QueryDetail from './pages/agent/QueryDetail';
+import AgentComplaintPage from './pages/agent/ComplaintPage';
 
 // Customer Pages
 import CustomerDashboard from './pages/customer/Dashboard';
@@ -21,6 +22,7 @@ import BookingPage from './pages/customer/Booking';
 import InventoryPage from './pages/customer/Inventory';
 import HistoryPage from './pages/customer/History';
 import CertificatesPage from './pages/customer/Certificates';
+import CustomerComplaintPage from './pages/customer/ComplaintPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/Dashboard';
@@ -28,6 +30,7 @@ import AgentManagement from './pages/admin/Agents';
 import GlobalMap from './pages/admin/Map';
 import AdminServices from './pages/admin/Services';
 import AdminCustomers from './pages/admin/Customers';
+import ComplaintCenter from './pages/admin/ComplaintCenter';
 import AgentPerformance from './pages/perfomance/Dashboard';
 import CategoryDetails from './pages/perfomance/CategoryDetails';
 
@@ -38,6 +41,7 @@ import InquiryItemDetailPage from './pages/partner/InquiryItemDetailPage';
 import SiteAssessmentFormPage from './pages/partner/SiteAssessmentFormPage';
 import StickersUsagePage from './pages/partner/StickersUsagePage';
 import AiAgentPage from './pages/partner/AiAgentPage';
+import PartnerComplaintPage from './pages/partner/ComplaintPage';
 
 
 
@@ -84,6 +88,7 @@ function App() {
                   <Route path="query/:id" element={<QueryDetail />} />
                   <Route path="performance" element={<AgentPerformance />} />
                   <Route path="performance/:category" element={<CategoryDetails />} />
+                  <Route path="complaint" element={<AgentComplaintPage />} />
 
                 </Routes>
               </ProtectedRoute>
@@ -98,6 +103,7 @@ function App() {
                   <Route path="inventory" element={<InventoryPage />} />
                   <Route path="history" element={<HistoryPage />} />
                   <Route path="certificates" element={<CertificatesPage />} />
+                  <Route path="complaint" element={<CustomerComplaintPage />} />
                 </Routes>
               </ProtectedRoute>
             } />
@@ -111,6 +117,7 @@ function App() {
                   <Route path="customers" element={<AdminCustomers />} />
                   <Route path="map" element={<GlobalMap />} />
                   <Route path="services" element={<AdminServices />} />
+                  <Route path="complaints" element={<ComplaintCenter />} />
                 </Routes>
               </ProtectedRoute>
             } />
@@ -122,6 +129,7 @@ function App() {
                   <Route path="dashboard" element={<PartnerDashboard />} />
                   <Route path="stickers" element={<StickersUsagePage />} />
                   <Route path="ai-agent" element={<AiAgentPage />} />
+                  <Route path="complaint" element={<PartnerComplaintPage />} />
                   <Route path="inquiry/:id/item/:itemId/site-assessment" element={<SiteAssessmentFormPage />} />
                   <Route path="inquiry/:id/item/:itemId" element={<InquiryItemDetailPage />} />
                   <Route path="inquiry/:id" element={<InquiryItemsList />} />

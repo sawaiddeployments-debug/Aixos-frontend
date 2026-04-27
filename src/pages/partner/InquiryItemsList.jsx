@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Package, ArrowLeft, Eye, Building2, Loader2, CheckCircle2, ChevronRight, Truck, Calendar, XCircle } from 'lucide-react';
+import { Package, ArrowLeft, Eye, Building2, Loader2, CheckCircle2, ChevronRight, Truck, Calendar, XCircle, Download } from 'lucide-react';
+import pdfMake from 'pdfmake/build/pdfmake';
+import pdfFonts from 'pdfmake/build/vfs_fonts';
 import { getInquiryById, updateInquiryStatus } from '../../api/partners';
 import { 
     acceptInquiry, 
@@ -15,6 +17,11 @@ import { buildRefillInquiryViewModel } from './utils/refillInquiryViewModel';
 import DeliveryScheduleModal from './components/DeliveryScheduleModal';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../../supabaseClient';
+
+const pdfVfs = pdfFonts?.pdfMake?.vfs || pdfFonts?.vfs;
+if (pdfVfs && !pdfMake.vfs) {
+    pdfMake.vfs = pdfVfs;
+}
 
 const getInquiryTypeKey = (inquiry) =>
     (inquiry?.type || inquiry?.inquiry_type || '').toString().trim().toLowerCase();
@@ -65,7 +72,7 @@ const InquiryItemsList = () => {
     const [servicePricing, setServicePricing] = useState([]);
     const refillRef = useRef(null);
 
-    const fetchInquiry = async () => {
+    const fetchInquiry = useCallback(async () => {
         setLoading(true);
         try {
             const data = await getInquiryById(id);
@@ -78,7 +85,7 @@ const InquiryItemsList = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [id]);
 
     const handleStatusUpdate = async (newStatus, payload = {}) => {
         setActionLoading(true);
@@ -191,12 +198,12 @@ const InquiryItemsList = () => {
 
     useEffect(() => {
         fetchInquiry();
-    }, [id]);
+    }, [fetchInquiry]);
 
     useEffect(() => {
         let cancelled = false;
         if (!inquiry?.id) return undefined;
-        const key = getInquiryTypeKey(inquiry);
+        const key = (inquiry?.type || inquiry?.inquiry_type || '').toString().trim().toLowerCase();
         if (key !== 'refill' && key !== 'refilled') return undefined;
         fetchServicePricing().then((rows) => {
             if (!cancelled) setServicePricing(rows);
@@ -209,6 +216,8 @@ const InquiryItemsList = () => {
     const inquiryTypeKey = inquiry ? getInquiryTypeKey(inquiry) : '';
     const isValidation = inquiryTypeKey === 'validation';
     const isRefill = isRefillInquiryType(inquiryTypeKey);
+    const canGenerateServiceReport =
+        (inquiry?.status || '').toLowerCase() === 'completed' || inquiry?.service_confirmed === true;
 
     const validationViewModel = useMemo(() => {
         if (!inquiry || !isValidation) return null;
@@ -219,6 +228,116 @@ const InquiryItemsList = () => {
         if (!inquiry || !isRefill) return null;
         return buildRefillInquiryViewModel(inquiry, servicePricing);
     }, [inquiry, isRefill, servicePricing]);
+
+    const formatVal = (value) => {
+        if (value === null || value === undefined || value === '') return '—';
+        return String(value);
+    };
+
+    const formatCurrency = (value) => {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return 'SAR 0.00';
+        return `SAR ${numeric.toFixed(2)}`;
+    };
+
+    const generateServiceReport = () => {
+        if (!inquiry) return;
+        const inquiryItems = Array.isArray(inquiry.inquiry_items) ? inquiry.inquiry_items : [];
+        const customer = inquiry.customers || {};
+        const inquiryType = formatVal(inquiry.inquiry_type || inquiry.type || '—').replaceAll('_', ' ');
+        const issueText = formatVal(inquiry.notes || inquiry.description || 'No issue notes');
+
+        const itemRows = inquiryItems.length
+            ? inquiryItems.map((row) => ([
+                formatVal(row.type || row.system || 'Service Item'),
+                formatVal(row.capacity || row.unit || '—'),
+                formatVal(row.quantity ?? 1),
+                formatCurrency(row.price)
+            ]))
+            : [['No items', '—', '—', '—']];
+
+        const docDefinition = {
+            pageSize: 'A4',
+            pageMargins: [32, 36, 32, 36],
+            content: [
+                { text: 'Service Report', style: 'reportTitle', margin: [0, 0, 0, 16] },
+                { text: 'Inquiry Details', style: 'sectionHeading' },
+                {
+                    columns: [
+                        [
+                            { text: `Inquiry ID: ${formatVal(inquiry.id || id)}`, style: 'metaText' },
+                            { text: `Inquiry Type: ${inquiryType}`, style: 'metaText' }
+                        ],
+                        [
+                            { text: `Date: ${formatVal(new Date(inquiry.created_at).toLocaleString())}`, style: 'metaText' },
+                            { text: `Status: ${formatVal(inquiry.status)}`, style: 'metaText' }
+                        ]
+                    ],
+                    margin: [0, 0, 0, 12]
+                },
+                { text: 'Customer Details', style: 'sectionHeading' },
+                {
+                    columns: [
+                        [
+                            { text: `Name: ${formatVal(customer.owner_name || customer.business_name)}`, style: 'metaText' },
+                            { text: `Email: ${formatVal(customer.email)}`, style: 'metaText' }
+                        ],
+                        [
+                            { text: `Phone: ${formatVal(customer.phone)}`, style: 'metaText' },
+                            { text: `Address: ${formatVal(customer.address)}`, style: 'metaText' }
+                        ]
+                    ],
+                    margin: [0, 0, 0, 12]
+                },
+                { text: 'Service Details', style: 'sectionHeading' },
+                {
+                    columns: [
+                        [
+                            { text: `Service Type: ${inquiryType}`, style: 'metaText' },
+                            { text: `Priority: ${formatVal(inquiry.priority || 'Medium')}`, style: 'metaText' }
+                        ],
+                        [
+                            { text: `Notes / Issue: ${issueText}`, style: 'metaText' }
+                        ]
+                    ],
+                    margin: [0, 0, 0, 14]
+                },
+                { text: 'Line Items', style: 'sectionHeading' },
+                {
+                    table: {
+                        headerRows: 1,
+                        widths: ['*', 'auto', 'auto', 'auto'],
+                        body: [
+                            [
+                                { text: 'Product', style: 'tableHeader' },
+                                { text: 'Capacity', style: 'tableHeader' },
+                                { text: 'Quantity', style: 'tableHeader' },
+                                { text: 'Price', style: 'tableHeader' }
+                            ],
+                            ...itemRows
+                        ]
+                    },
+                    layout: 'lightHorizontalLines',
+                    margin: [0, 0, 0, 18]
+                },
+                {
+                    text: 'Services marketed by Aixos',
+                    color: '#DC2626',
+                    alignment: 'center',
+                    bold: true,
+                    margin: [0, 20, 0, 0]
+                }
+            ],
+            styles: {
+                reportTitle: { fontSize: 22, bold: true, color: '#0F172A' },
+                sectionHeading: { fontSize: 12, bold: true, margin: [0, 8, 0, 6] },
+                metaText: { fontSize: 10, margin: [0, 2, 0, 2] },
+                tableHeader: { bold: true, fontSize: 10 }
+            }
+        };
+
+        pdfMake.createPdf(docDefinition).download(`service-report-${id}.pdf`);
+    };
 
     if (loading) {
         return (
@@ -283,6 +402,16 @@ const InquiryItemsList = () => {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    {canGenerateServiceReport && (
+                        <button
+                            type="button"
+                            onClick={generateServiceReport}
+                            className="px-6 py-3 bg-primary-500 text-white hover:bg-primary-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg w-full sm:w-auto"
+                        >
+                            <Download size={16} />
+                            Generate Service Report
+                        </button>
+                    )}
                     {/* Delivery Status Indicator */}
                     {isRefill && inquiry.delivery_mode === 'partner' && (
                         <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border shadow-sm ${

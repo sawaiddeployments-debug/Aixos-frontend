@@ -25,8 +25,9 @@ import {
     switchPartner
 } from '../../api/maintenanceApi';
 import SwitchPartnerModal from './components/SwitchPartnerModal';
+import InquiryChatBox from '../../components/Chat/InquiryChatBox';
 import { toast } from 'react-hot-toast';
-import { Truck, Clock, CheckCircle, AlertCircle, UserPlus } from 'lucide-react';
+import { Truck, Clock, CheckCircle, AlertCircle, UserPlus, MessageCircle, X } from 'lucide-react';
 
 const QueryDetail = () => {
     const { id } = useParams();
@@ -37,6 +38,7 @@ const QueryDetail = () => {
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [isSwitchModalOpen, setIsSwitchModalOpen] = useState(false);
+    const [isChatOpen, setIsChatOpen] = useState(false);
 
     useEffect(() => {
         fetchQueryDetail();
@@ -543,6 +545,15 @@ const QueryDetail = () => {
                     {/* Quick Actions */}
                     <section className="bg-white rounded-3xl border p-6 text-center space-y-4">
                         <h3 className="font-bold">Need Help?</h3>
+                        {query.partner_id && (
+                            <button
+                                onClick={() => setIsChatOpen(true)}
+                                className="w-full py-3.5 bg-primary-500 text-white rounded-2xl font-bold text-sm hover:bg-primary-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary-500/20"
+                            >
+                                <MessageCircle size={18} />
+                                Message Partner
+                            </button>
+                        )}
                         <button
                             onClick={() => navigate(`/agent/customer/${query.customer_id}`)}
                             className="w-full py-3.5 bg-slate-900 text-white rounded-2xl font-medium hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
@@ -561,6 +572,27 @@ const QueryDetail = () => {
                 loading={actionLoading}
                 currentPartnerId={query.partner_id}
             />
+
+            {/* Chat Modal */}
+            {isChatOpen && query.partner_id && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-6 bg-black/50 backdrop-blur-sm"
+                    onClick={() => setIsChatOpen(false)}
+                >
+                    <div
+                        className="w-full sm:max-w-md h-[70vh] sm:h-[500px] sm:rounded-2xl overflow-hidden shadow-2xl bg-white"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <InquiryChatBox
+                            inquiryId={id}
+                            recipientId={query.partner_id}
+                            recipientRole="partner"
+                            title={query.partners?.business_name || 'Partner'}
+                            onClose={() => setIsChatOpen(false)}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

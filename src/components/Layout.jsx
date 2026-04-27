@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, LayoutDashboard, Calendar, FileText, User, ShoppingBag, Map, Shield, Bookmark, FireExtinguisher, Clock, Menu, X, Tag, Bot } from 'lucide-react';
+import { LogOut, LayoutDashboard, Calendar, FileText, User, ShoppingBag, Map, Shield, Bookmark, FireExtinguisher, Clock, Menu, X, Tag, Bot, MessageSquare } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useLocationTracker from '../hooks/useLocationTracker';
 import NotificationBell from './NotificationBell';
@@ -40,6 +40,7 @@ const Layout = ({ children }) => {
                 { icon: User, label: 'My Customers', to: '/agent/customers' },
                 { icon: FileText, label: 'Log Visit', to: '/agent/visit' },
                 { icon: Calendar, label: 'Performance', to: '/agent/performance' },
+                { icon: MessageSquare, label: 'Complaint', to: '/agent/complaint' },
             ];
         } else if (role === 'customer') {
             return [
@@ -48,6 +49,7 @@ const Layout = ({ children }) => {
                 { icon: ShoppingBag, label: 'New inquiry', to: '/customer/booking' },
                 { icon: Clock, label: 'Service History', to: '/customer/history' },
                 { icon: Shield, label: 'Certificates', to: '/customer/certificates' },
+                { icon: MessageSquare, label: 'Complaint', to: '/customer/complaint' },
             ];
         } else if (role === 'admin') {
             return [
@@ -56,12 +58,14 @@ const Layout = ({ children }) => {
                 { icon: ShoppingBag, label: 'Total Customers', to: '/admin/customers' },
                 { icon: Bookmark, label: 'Service Queue', to: '/admin/services' },
                 { icon: Map, label: 'Global Map', to: '/admin/map' },
+                { icon: MessageSquare, label: 'Complaint Center', to: '/admin/complaints' },
             ];
         } else if (role === 'partner') {
             return [
                 { icon: LayoutDashboard, label: 'Partner Dashboard', to: '/partner/dashboard' },
                 { icon: Tag, label: 'Stickers usage', to: '/partner/stickers' },
                 { icon: Bot, label: 'AI Agent', to: '/partner/ai-agent' },
+                { icon: MessageSquare, label: 'Complaint', to: '/partner/complaint' },
             ];
         }
         return [];

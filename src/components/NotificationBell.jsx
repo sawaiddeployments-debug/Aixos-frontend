@@ -3,6 +3,7 @@ import { Bell, MessageSquare, Clock, Check, Trash2, AlertTriangle, FileText, Pac
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabaseClient';
 import { fetchCustomerInquiries, fetchCustomerQuotations } from '../api/customerPortal';
+import { getComplaintUnreadCountForAdmin, getComplaintUnreadCountForUser } from '../api/complaintsApi';
 import { Link } from 'react-router-dom';
 
 const EXPIRY_DAYS = 10;
@@ -115,6 +116,22 @@ const NotificationBell = ({ onOpenChat }) => {
             console.warn('NotificationBell db fetches:', e);
         }
 
+        try {
+            const complaintUnread = await getComplaintUnreadCountForUser(user.id);
+            if (complaintUnread > 0) {
+                list.unshift({
+                    id: `complaint-user-${user.id}`,
+                    title: 'Complaint reply',
+                    message: `${complaintUnread} unread reply${complaintUnread > 1 ? 'ies' : 'y'} from admin`,
+                    type: 'complaint',
+                    timestamp: new Date().toISOString(),
+                    isRead: false
+                });
+            }
+        } catch (e) {
+            console.warn('NotificationBell complaint user:', e);
+        }
+
         list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         setNotifications(list.slice(0, 15));
         setUnreadCount(list.filter((n) => !n.isRead).length);
@@ -159,10 +176,88 @@ const NotificationBell = ({ onOpenChat }) => {
             console.warn('NotificationBell agent db:', e);
         }
 
+        try {
+            const complaintUnread = await getComplaintUnreadCountForUser(user.id);
+            if (complaintUnread > 0) {
+                list.unshift({
+                    id: `complaint-agent-${user.id}`,
+                    title: 'Complaint reply',
+                    message: `${complaintUnread} unread complaint reply from admin`,
+                    type: 'complaint',
+                    timestamp: new Date().toISOString(),
+                    isRead: false
+                });
+            }
+        } catch (e) {
+            console.warn('NotificationBell complaint agent:', e);
+        }
+
         list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         setNotifications(list.slice(0, 15));
         setUnreadCount(list.filter((n) => !n.isRead).length);
     }, [user?.id]);
+
+    const loadGenericNotifications = useCallback(async () => {
+        if (!user?.id) return;
+        const list = [];
+        try {
+            const { data: dbNotifs, error } = await supabase
+                .from('notifications')
+                .select('*')
+                .eq('recipient_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(15);
+
+            if (!error && dbNotifs) {
+                dbNotifs.forEach((n) => {
+                    list.push({
+                        id: `notif-${n.id}`,
+                        title: 'System alert',
+                        message: n.message,
+                        type: 'message',
+                        timestamp: n.created_at,
+                        isRead: n.is_read
+                    });
+                });
+            }
+        } catch (e) {
+            console.warn('NotificationBell generic db:', e);
+        }
+
+        try {
+            if (role === 'admin') {
+                const adminUnread = await getComplaintUnreadCountForAdmin();
+                if (adminUnread > 0) {
+                    list.unshift({
+                        id: 'complaint-admin-unread',
+                        title: 'Complaint Center',
+                        message: `${adminUnread} unread user complaint${adminUnread > 1 ? 's' : ''}`,
+                        type: 'complaint',
+                        timestamp: new Date().toISOString(),
+                        isRead: false
+                    });
+                }
+            } else {
+                const userUnread = await getComplaintUnreadCountForUser(user.id);
+                if (userUnread > 0) {
+                    list.unshift({
+                        id: `complaint-generic-${user.id}`,
+                        title: 'Complaint reply',
+                        message: `${userUnread} unread complaint reply from admin`,
+                        type: 'complaint',
+                        timestamp: new Date().toISOString(),
+                        isRead: false
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('NotificationBell generic complaint:', e);
+        }
+
+        list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        setNotifications(list.slice(0, 15));
+        setUnreadCount(list.filter((n) => !n.isRead).length);
+    }, [user?.id, role]);
 
     useEffect(() => {
         if (role === 'customer' && user?.id) {
@@ -211,11 +306,44 @@ const NotificationBell = ({ onOpenChat }) => {
             };
         }
 
-        if (role !== 'customer' && role !== 'agent') {
-            setNotifications([]);
-            setUnreadCount(0);
+        if ((role === 'partner' || role === 'admin') && user?.id) {
+            loadGenericNotifications();
+
+            const notifChannel = supabase
+                .channel(`user_notifications_generic_${user.id}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'INSERT',
+                        table: 'notifications',
+                        filter: `recipient_id=eq.${user.id}`
+                    },
+                    () => {
+                        loadGenericNotifications();
+                    }
+                )
+                .subscribe();
+
+            const complaintChannel = supabase
+                .channel(`user_complaints_generic_${user.id}`)
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'complaints' }, () => {
+                    loadGenericNotifications();
+                })
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(notifChannel);
+                supabase.removeChannel(complaintChannel);
+            };
         }
-    }, [role, user?.id, loadCustomerNotifications, loadAgentNotifications]);
+
+        if (role !== 'customer' && role !== 'agent') {
+            if (role !== 'partner' && role !== 'admin') {
+                setNotifications([]);
+                setUnreadCount(0);
+            }
+        }
+    }, [role, user?.id, loadCustomerNotifications, loadAgentNotifications, loadGenericNotifications]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {

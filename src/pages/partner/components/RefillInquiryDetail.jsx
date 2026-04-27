@@ -1,14 +1,23 @@
 import React, { useState, useEffect, useMemo, forwardRef, useImperativeHandle, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Split, Truck, Info, XCircle, MessageCircle, ChevronLeft, Loader2, Beaker, Calendar, Clock, CheckCircle2 } from 'lucide-react';
+import { Split, Truck, Info, XCircle, MessageCircle, ChevronLeft, Loader2, Beaker, Calendar, Clock, CheckCircle2, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../../context/AuthContext';
 import { finalizeRefillAcceptance } from '../../../api/partnerRefill';
+import CustomerContactSection from './CustomerContactSection';
+import InquiryChatBox from '../../../components/Chat/InquiryChatBox';
 
 const num = (v, fallback = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 };
+
+const DetailField = ({ label, value }) => (
+  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">{label}</p>
+    <p className="text-slate-900 font-semibold text-sm break-words">{value ?? '—'}</p>
+  </div>
+);
 
 /**
  * Process Refill Request — per-kg pricing, per-line partial acceptance.
@@ -26,7 +35,12 @@ const RefillInquiryDetail = forwardRef(({ viewModel, onFinalized }, ref) => {
     isTransportChargeable,
     requirementNote,
     customerEmail,
+    customerPhone,
+    customerOwnerName,
     customerId,
+    customerAddress,
+    customerLocationLat,
+    customerLocationLng,
     refillLines: modelLines,
     transportFlatSar,
     inquiryId,
@@ -77,6 +91,7 @@ const RefillInquiryDetail = forwardRef(({ viewModel, onFinalized }, ref) => {
 
   const [lines, setLines] = useState(() => []);
   const [saving, setSaving] = useState(false);
+  const [openChat, setOpenChat] = useState(null); // null | 'customer' | 'agent'
 
   useEffect(() => {
     if (!modelLines || !inquiryId) return;
@@ -118,8 +133,6 @@ const RefillInquiryDetail = forwardRef(({ viewModel, onFinalized }, ref) => {
     setLines(expanded);
     lastInquiryIdRef.current = inquiryId;
   }, [modelLines, inquiryId]);
-
-  const mailHref = customerEmail ? `mailto:${customerEmail}` : null;
 
   const defaultPickupDescription =
     isTransportChargeable && transportFlatSar > 0
@@ -251,23 +264,32 @@ const RefillInquiryDetail = forwardRef(({ viewModel, onFinalized }, ref) => {
               <p className="text-slate-500 font-medium">
                 Inquiry: {inquiryNo} | {customerName}
               </p>
-              {mailHref ? (
-                <a
-                  href={mailHref}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-600 transition-all shadow-lg shadow-slate-200"
-                >
-                  <MessageCircle size={14} /> Message Customer
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  title="No customer email on file"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed"
-                >
-                  <MessageCircle size={14} /> Message Customer
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setOpenChat(prev => prev === 'customer' ? null : 'customer')}
+                disabled={!customerId}
+                title={customerId ? 'Chat with Customer' : 'No customer linked'}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-slate-200 ${
+                  openChat === 'customer'
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-slate-900 text-white hover:bg-primary-600'
+                } disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed disabled:shadow-none`}
+              >
+                <MessageCircle size={14} /> Message Customer
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpenChat(prev => prev === 'agent' ? null : 'agent')}
+                disabled={!agentId}
+                title={agentId ? 'Chat with Agent' : 'No agent assigned'}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-slate-200 ${
+                  openChat === 'agent'
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-slate-700 text-white hover:bg-primary-600'
+                } disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed disabled:shadow-none`}
+              >
+                <User size={14} /> Message Agent
+              </button>
             </div>
           </div>
           <Link
@@ -280,6 +302,39 @@ const RefillInquiryDetail = forwardRef(({ viewModel, onFinalized }, ref) => {
         </div>
 
         <div className="p-8 space-y-12">
+          {/* Customer Contact */}
+          <CustomerContactSection
+            ownerName={customerOwnerName}
+            email={customerEmail}
+            phone={customerPhone}
+            customerId={customerId}
+            address={customerAddress}
+            locationLat={customerLocationLat}
+            locationLng={customerLocationLng}
+          />
+
+          {/* Chat Section */}
+          {openChat === 'customer' && customerId && inquiryId && (
+            <div className="animate-in slide-in-from-top-2 duration-300">
+              <InquiryChatBox
+                inquiryId={inquiryId}
+                recipientId={customerId}
+                recipientRole="Customer"
+                title="Chat with Customer"
+              />
+            </div>
+          )}
+          {openChat === 'agent' && agentId && inquiryId && (
+            <div className="animate-in slide-in-from-top-2 duration-300">
+              <InquiryChatBox
+                inquiryId={inquiryId}
+                recipientId={agentId}
+                recipientRole="Agent"
+                title="Chat with Agent"
+              />
+            </div>
+          )}
+
           <div className="space-y-8">
             <div>
               <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">

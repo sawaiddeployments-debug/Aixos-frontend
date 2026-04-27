@@ -64,7 +64,13 @@ export const buildValidationInquiryViewModel = (inquiry) => {
             agentNotes: '',
             status: '—',
             utilizationRows: [],
-            customerEmail: null
+            customerEmail: null,
+            customerPhone: null,
+            customerOwnerName: null,
+            customerId: null,
+            customerAddress: null,
+            customerLocationLat: null,
+            customerLocationLng: null,
         };
     }
 
@@ -120,6 +126,12 @@ export const buildValidationInquiryViewModel = (inquiry) => {
         agentNotes,
         status: inquiry.status || '—',
         utilizationRows: normalizeUtilizationRows(inquiry),
-        customerEmail: customers.email || inquiry.customer_email || null
+        customerEmail: customers.email || inquiry.customer_email || null,
+        customerPhone: customers.phone || inquiry.customer_phone || null,
+        customerOwnerName: customers.owner_name || inquiry.customer_owner_name || null,
+        customerId: inquiry.customer_id || customers.id || null,
+        customerAddress: customers.address || inquiry.customer_address || null,
+        customerLocationLat: customers.location_lat ?? null,
+        customerLocationLng: customers.location_lng ?? null,
     };
 };
