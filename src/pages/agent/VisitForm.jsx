@@ -446,7 +446,7 @@ const VisitForm = () => {
 
           const { data, error } = await supabase
             .from('customers')
-            .select('id, business_name, owner_name, email, phone, address, business_type, image_url')
+            .select('id, business_name, owner_name, email, phone, address, business_type, image_url, qr_code_url')
             .or(searchFilter)
             .limit(10);
 
