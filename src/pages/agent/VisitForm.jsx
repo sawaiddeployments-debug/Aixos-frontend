@@ -289,14 +289,15 @@ const VisitForm = () => {
       customMaterial: '',
       validationPhoto: null,
       validation_mode: 'new',
-      validationFollowUpDate: ''
+      validationFollowUpDate: '',
+      qrCodeValue: '',
     }
   ]);
 
-  const [qrCodeValue, setQrCodeValue] = useState('');
   /** Which inline scanner is open, e.g. `v-0` (Validation) or `r-1` (Refill); only one camera at a time */
   const [qrScannerSlot, setQrScannerSlot] = useState(null);
-  const lastQrToastRef = useRef({ invalid: null });
+  // keyed by extinguisher index to debounce duplicate invalid-QR toasts
+  const lastQrToastRef = useRef({});
 
   const needsQrScan = useMemo(
     () =>
@@ -308,8 +309,10 @@ const VisitForm = () => {
     [extinguishers]
   );
 
-  /** Gate: valid if matches expected code */
-  const isQrValid = qrCodeValue === EXPECTED_VISIT_QR;
+  /** True when any unit has a scanned QR that doesn't match the expected code */
+  const hasAnyInvalidQr = extinguishers.some(
+    (ext) => ext.qrCodeValue && ext.qrCodeValue !== EXPECTED_VISIT_QR
+  );
 
   useEffect(() => {
     if (selectedCustomer) {
@@ -327,18 +330,18 @@ const VisitForm = () => {
     return t === 'validation' || t === 'refill' || t === 'refilled';
   };
 
-  const handleQrDecoded = (text) => {
+  const handleQrDecoded = (text, extIndex) => {
     const qrValue = (text || '').trim();
-    setQrCodeValue(qrValue);
+    handleExtinguisherChange(extIndex, 'qrCodeValue', qrValue);
     if (qrValue === EXPECTED_VISIT_QR) {
       toast.success('QR Code Verified');
       setQrScannerSlot(null);
-      lastQrToastRef.current.invalid = null;
+      delete lastQrToastRef.current[extIndex];
       return;
     }
-    if (lastQrToastRef.current.invalid !== qrValue) {
+    if (lastQrToastRef.current[extIndex] !== qrValue) {
       toast.error('Invalid QR Code');
-      lastQrToastRef.current.invalid = qrValue;
+      lastQrToastRef.current[extIndex] = qrValue;
     }
   };
 
@@ -636,7 +639,8 @@ const VisitForm = () => {
       customFirefightingSystem: '',
       validationPhoto: null,
       validation_mode: 'new',
-      validationFollowUpDate: ''
+      validationFollowUpDate: '',
+      qrCodeValue: '',
     }]);
   };
 
@@ -1042,8 +1046,11 @@ const VisitForm = () => {
       return;
     }
 
-    if (qrCodeValue && !isQrValid) {
-      toast.error('Invalid QR Code. Please scan the valid site QR code or clear the field to proceed.');
+    const invalidQrIndex = extinguishers.findIndex(
+      (ext) => ext.qrCodeValue && ext.qrCodeValue !== EXPECTED_VISIT_QR
+    );
+    if (invalidQrIndex !== -1) {
+      toast.error(`Invalid QR Code on unit ${invalidQrIndex + 1}. Scan the correct QR or skip it to proceed.`);
       return;
     }
 
@@ -1279,7 +1286,9 @@ const VisitForm = () => {
           priority: 'Medium',
           performed_by: formData.performedBy || 'Agent',
           follow_up_date: formData.followUpDate || null,
-          qr_code_value: needsQrScan ? (qrCodeValue || null) : null
+          qr_code_value: needsQrScan
+            ? (extinguishers.find((e) => e.qrCodeValue === EXPECTED_VISIT_QR)?.qrCodeValue ?? null)
+            : null
         };
 
         // DEBUG LOGS (Updated)
@@ -1715,16 +1724,32 @@ const VisitForm = () => {
                 {/* QR Code Section */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700 mb-2">Identity QR Code</label>
-                  <button
-                    onClick={generateQRPreview}
-                    className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-sm font-bold transition-colors"
-                  >
-                    Generate Local QR Code
-                  </button>
-                  {qrPreview && (
-                    <div className="mt-4 flex justify-center">
-                      <img src={qrPreview} className="h-20 w-20 border rounded-2xl" alt="QR Preview" />
+
+                  {!isNewCustomer && selectedCustomer?.qr_code_url ? (
+                    /* Existing customer already has a QR — display it */
+                    <div className="flex flex-col items-center gap-2">
+                      <img
+                        src={selectedCustomer.qr_code_url}
+                        className="h-24 w-24 border rounded-2xl object-contain"
+                        alt="Customer QR Code"
+                      />
+                      <p className="text-xs text-slate-500 font-medium">Existing QR Code</p>
                     </div>
+                  ) : (
+                    /* New customer, or existing customer with no QR yet */
+                    <>
+                      <button
+                        onClick={generateQRPreview}
+                        className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-sm font-bold transition-colors"
+                      >
+                        Generate QR Code
+                      </button>
+                      {qrPreview && (
+                        <div className="mt-4 flex justify-center">
+                          <img src={qrPreview} className="h-20 w-20 border rounded-2xl" alt="QR Preview" />
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -1972,10 +1997,10 @@ const VisitForm = () => {
                             qrScannerSlot={qrScannerSlot}
                             onQrScannerSlotChange={setQrScannerSlot}
                             readerId={`visit-qr-v-${index}`}
-                            qrCodeValue={qrCodeValue}
+                            qrCodeValue={ext.qrCodeValue || ''}
                             needsQrScan={needsQrScan}
-                            isQrValid={isQrValid}
-                            onDecoded={handleQrDecoded}
+                            isQrValid={(ext.qrCodeValue || '') === EXPECTED_VISIT_QR}
+                            onDecoded={(text) => handleQrDecoded(text, index)}
                             hint="Scan the site verification QR after the photo reference (optional)."
                           />
                         </>
@@ -2343,10 +2368,10 @@ const VisitForm = () => {
                         qrScannerSlot={qrScannerSlot}
                         onQrScannerSlotChange={setQrScannerSlot}
                         readerId={`visit-qr-r-${index}`}
-                        qrCodeValue={qrCodeValue}
+                        qrCodeValue={ext.qrCodeValue || ''}
                         needsQrScan={needsQrScan}
-                        isQrValid={isQrValid}
-                        onDecoded={handleQrDecoded}
+                        isQrValid={(ext.qrCodeValue || '') === EXPECTED_VISIT_QR}
+                        onDecoded={(text) => handleQrDecoded(text, index)}
                         hint="Scan the site verification QR after entering the expiry date (optional)."
                       />
                     </>
@@ -2780,7 +2805,7 @@ const VisitForm = () => {
             <button
               type="button"
               onClick={() => setStep(3)}
-              disabled={qrCodeValue && !isQrValid}
+              disabled={hasAnyInvalidQr}
               className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
             >
               Next: Site Assessment <ArrowRight size={18} />
@@ -2964,7 +2989,7 @@ const VisitForm = () => {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={loading || (qrCodeValue && !isQrValid)}
+                disabled={loading || hasAnyInvalidQr}
                 className="btn-primary flex items-center gap-2 px-8 py-3 text-lg shadow-xl shadow-primary-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
               >
                 {loading ? 'Submitting...' : 'Finish & Save Log'} <Check size={20} />
