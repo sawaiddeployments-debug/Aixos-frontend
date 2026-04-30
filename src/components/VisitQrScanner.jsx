@@ -1,172 +1,180 @@
 import { useEffect, useRef } from 'react';
-import toast from 'react-hot-toast';
-import {
-  Html5Qrcode,
-  Html5QrcodeScannerState,
-  Html5QrcodeSupportedFormats,
-} from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 
-const safeCleanup = (scanner) => {
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const stopScanner = async (scanner) => {
   if (!scanner) return;
   try {
     const state = scanner.getState();
-    const running =
+    if (
       state === Html5QrcodeScannerState.SCANNING ||
-      state === Html5QrcodeScannerState.PAUSED;
-    if (running) {
-      scanner
-        .stop()
-        .then(() => scanner.clear())
-        .catch(() => {
-          try {
-            scanner.clear();
-          } catch {
-            /* ignore */
-          }
-        });
-    } else {
-      try {
-        scanner.clear();
-      } catch {
-        /* ignore */
-      }
+      state === Html5QrcodeScannerState.PAUSED
+    ) {
+      await scanner.stop();
+      console.log('[QR] scanner stopped');
     }
+  } catch (e) {
+    console.warn('[QR] stop error (ignored):', e?.message);
+  }
+  try {
+    scanner.clear();
   } catch {
-    try {
-      scanner.clear();
-    } catch {
-      /* ignore */
-    }
+    /* ignore */
   }
 };
 
-const waitForLayout = (readerId, maxAttempts = 18) =>
+/** Wait until the container has a real width (max ~3 s). */
+const waitForElement = (id) =>
   new Promise((resolve) => {
-    let n = 0;
+    const deadline = Date.now() + 3000;
     const tick = () => {
-      const el = document.getElementById(readerId);
-      if (el && el.clientWidth >= 48) {
-        resolve(true);
-        return;
-      }
-      n += 1;
-      if (n >= maxAttempts) {
-        resolve(!!document.getElementById(readerId));
-        return;
-      }
+      const el = document.getElementById(id);
+      if (el && el.clientWidth > 0) return resolve(el);
+      if (Date.now() > deadline) return resolve(null);
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   });
 
-/** Pick a real device when possible — `environment` alone often fails on laptops (no back camera). */
-const resolveCameraConfig = async () => {
-  try {
-    const cameras = await Html5Qrcode.getCameras();
-    if (!cameras?.length) {
-      return { facingMode: 'user' };
-    }
-    const back = cameras.find((c) =>
-      /back|rear|environment|wide/i.test(c.label || '')
-    );
-    return back ? back.id : cameras[0].id;
-  } catch {
-    return { facingMode: 'user' };
-  }
+/** Build video constraints that favour the rear camera.
+ *  Uses `ideal` (not `exact`) so iOS doesn't throw OverconstrainedError. */
+const rearCameraConstraints = {
+  facingMode: { ideal: 'environment' },
+  width: { ideal: 1280 },
+  height: { ideal: 720 },
 };
 
-const buildScannerConfig = () => ({
-  /** Higher FPS = more decode attempts per second (snappier scan) */
-  fps: 20,
-  /** QR is symmetric; skipping mirror retry saves ~half the per-frame work */
-  disableFlip: true,
-  /** Slightly smaller region = less pixels to decode each frame */
-  qrbox: (viewfinderWidth, viewfinderHeight) => {
-    const m = Math.min(viewfinderWidth, viewfinderHeight);
-    const side = Math.max(112, Math.min(260, Math.floor(m * 0.66)));
-    return { width: side, height: side };
-  },
-});
-
-const createScanner = (readerId) =>
-  new Html5Qrcode(readerId, {
-    verbose: false,
-    formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-    /** Native BarcodeDetector (where available) is faster; falls back internally */
-    experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-  });
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 /**
- * Renders a camera QR scanner into `#readerId`. Parent controls visibility via `active`.
+ * Renders a live camera QR scanner.
+ *
+ * Props
+ *   readerId  – unique DOM id for the container div
+ *   active    – when true the camera starts; when false/unmounted it stops
+ *   onDecoded – called once with the raw decoded string on first successful scan
  */
 const VisitQrScanner = ({ readerId, active, onDecoded }) => {
   const onDecodedRef = useRef(onDecoded);
-  const scannerRef = useRef(null);
+  const scannerRef  = useRef(null);
+  const doneRef     = useRef(false); // prevents double-firing after stop
+
+  useEffect(() => { onDecodedRef.current = onDecoded; }, [onDecoded]);
 
   useEffect(() => {
-    onDecodedRef.current = onDecoded;
-  }, [onDecoded]);
+    if (!active || !readerId) return;
 
-  useEffect(() => {
-    if (!active || !readerId) return undefined;
-
-    let cancelled = false;
+    doneRef.current = false;
+    let cancelled   = false;
 
     const run = async () => {
-      await waitForLayout(readerId);
-      if (cancelled) return;
-
-      if (!document.getElementById(readerId)) {
-        if (!cancelled) {
-          toast.error('QR scanner could not find its view. Try again.');
-        }
+      // 1. Wait for the DOM element to have real dimensions
+      const el = await waitForElement(readerId);
+      if (!el) {
+        console.error('[QR] container not found or has zero width:', readerId);
         return;
       }
-
-      let cameraConfig = await resolveCameraConfig();
       if (cancelled) return;
+      console.log('[QR] container ready, starting scanner on', readerId);
 
-      let html5QrCode = createScanner(readerId);
-      scannerRef.current = html5QrCode;
+      // 2. Create scanner instance
+      //    – NO experimentalFeatures: BarcodeDetector is unreliable on iOS Safari
+      //    – verbose: false suppresses the per-frame "QR not found" spam
+      const scanner = new Html5Qrcode(readerId, { verbose: false });
+      scannerRef.current = scanner;
 
-      const scanConfig = buildScannerConfig();
+      // 3. Scanner config
+      //    – Fixed 250×250 qrbox: dynamic sizing can confuse the decoder
+      //    – disableFlip: false: some cameras/QR orientations need mirror check
+      //    – fps 10: stable; higher fps does not improve detection, wastes CPU
+      const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        disableFlip: false,
+      };
 
-      const startWith = async (cam) =>
-        html5QrCode.start(
-          cam,
-          scanConfig,
-          (decodedText) => {
-            onDecodedRef.current?.(decodedText);
-          },
-          () => { }
-        );
+      // 4. Success callback – fires on every decoded frame while scanning
+      const onSuccess = (decodedText) => {
+        if (doneRef.current || cancelled) return;
+        doneRef.current = true;
+        console.log('[QR] decoded:', decodedText);
 
-      try {
-        await startWith(cameraConfig);
-      } catch (firstErr) {
-        if (cancelled) return;
-        console.warn('QR camera start (primary) failed, trying fallback:', firstErr);
-        safeCleanup(html5QrCode);
-        html5QrCode = createScanner(readerId);
-        scannerRef.current = html5QrCode;
+        // Stop the scanner immediately so it doesn't keep firing
+        stopScanner(scanner).finally(() => {
+          if (scannerRef.current === scanner) scannerRef.current = null;
+        });
+
+        onDecodedRef.current?.(decodedText);
+      };
+
+      // 5. Error callback – called on every frame where no QR is found.
+      //    We only log actual errors, not the normal "not found" noise.
+      const onError = (err) => {
+        if (typeof err === 'string' && err.includes('No MultiFormat Readers')) return;
+        if (typeof err === 'string' && err.includes('NotFoundException')) return;
+        console.warn('[QR] scan error:', err);
+      };
+
+      // 6. Try rear camera first (best on mobile), fall back if unavailable
+      const tryStart = async () => {
+        // Attempt 1: enumerate cameras and pick a rear one by label
         try {
-          await startWith({ facingMode: 'user' });
-        } catch (secondErr) {
-          if (!cancelled) {
-            console.error('QR scanner start failed:', secondErr);
-            toast.error(
-              'Camera could not start. Allow camera access, or try another browser.'
-            );
+          const cameras = await Html5Qrcode.getCameras();
+          console.log('[QR] available cameras:', cameras.map((c) => c.label));
+          const rear = cameras.find((c) =>
+            /back|rear|environment|wide/i.test(c.label || '')
+          );
+          const cam = rear ?? cameras[0];
+          if (cam) {
+            console.log('[QR] starting with camera id:', cam.label || cam.id);
+            await scanner.start(cam.id, config, onSuccess, onError);
+            return; // success
           }
-          safeCleanup(html5QrCode);
-          scannerRef.current = null;
-          return;
+        } catch (e) {
+          console.warn('[QR] getCameras / start by id failed:', e?.message);
+          if (cancelled) return;
         }
-      }
+
+        // Attempt 2: facingMode: { ideal: 'environment' } – works on most mobiles
+        //            `ideal` never throws OverconstrainedError (unlike `exact`)
+        try {
+          console.log('[QR] trying facingMode ideal:environment');
+          await scanner.start(
+            { facingMode: { ideal: 'environment' } },
+            { ...config, videoConstraints: rearCameraConstraints },
+            onSuccess,
+            onError
+          );
+          return;
+        } catch (e) {
+          console.warn('[QR] environment facingMode failed:', e?.message);
+          if (cancelled) return;
+        }
+
+        // Attempt 3: any camera (front / laptop webcam)
+        try {
+          console.log('[QR] falling back to user facingMode');
+          await scanner.start(
+            { facingMode: 'user' },
+            config,
+            onSuccess,
+            onError
+          );
+        } catch (e) {
+          console.error('[QR] all camera attempts failed:', e?.message);
+        }
+      };
+
+      await tryStart();
 
       if (cancelled) {
-        safeCleanup(html5QrCode);
-        scannerRef.current = null;
+        stopScanner(scanner);
+        if (scannerRef.current === scanner) scannerRef.current = null;
       }
     };
 
@@ -176,15 +184,14 @@ const VisitQrScanner = ({ readerId, active, onDecoded }) => {
       cancelled = true;
       const s = scannerRef.current;
       scannerRef.current = null;
-      safeCleanup(s);
+      stopScanner(s);
     };
   }, [active, readerId]);
 
   return (
     <div
       id={readerId}
-      className="w-full min-h-[240px] min-w-[200px] rounded-2xl overflow-hidden bg-slate-900"
-      style={{ width: '100%' }}
+      className="w-full min-h-[260px] rounded-2xl overflow-hidden bg-slate-900"
     />
   );
 };
