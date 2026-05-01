@@ -646,45 +646,69 @@ const VisitForm = () => {
     setIsFetchingLocation(true);
     console.log('[Location] calling getCurrentPosition…');
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        console.log('[Location] success:', latitude, longitude);
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
-          );
-          if (!response.ok) throw new Error('Failed to fetch address');
-          const data = await response.json();
-          const readableAddress = data.display_name ||
-            `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`;
-          setFormData(prev => ({ ...prev, address: readableAddress }));
-        } catch (err) {
-          console.error('[Location] reverse geocoding error:', err);
+    try {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          console.log('[Location] success:', latitude, longitude);
+          // Store rounded coords immediately (used in QR payload)
           setFormData(prev => ({
             ...prev,
-            address: `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`
+            lat: parseFloat(latitude.toFixed(5)),
+            lng: parseFloat(longitude.toFixed(5)),
           }));
-          toast('Could not resolve a readable address — coordinates saved.', { icon: '📍' });
-        } finally {
+          try {
+            const controller = new AbortController();
+            const geocodeTimeout = setTimeout(() => controller.abort(), 8000);
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+              { signal: controller.signal }
+            );
+            clearTimeout(geocodeTimeout);
+            if (!response.ok) throw new Error('Failed to fetch address');
+            const data = await response.json();
+            const readableAddress = data.display_name ||
+              `Lat: ${latitude.toFixed(5)}, Lng: ${longitude.toFixed(5)}`;
+            setFormData(prev => ({ ...prev, address: readableAddress }));
+          } catch (err) {
+            console.error('[Location] reverse geocoding error:', err);
+            setFormData(prev => ({
+              ...prev,
+              address: `Lat: ${latitude.toFixed(5)}, Lng: ${longitude.toFixed(5)}`
+            }));
+            toast('Address lookup failed — coordinates saved instead.', { icon: '📍' });
+          } finally {
+            setIsFetchingLocation(false);
+          }
+        },
+        (err) => {
           setIsFetchingLocation(false);
-        }
-      },
-      (err) => {
-        setIsFetchingLocation(false);
-        console.warn('[Location] error:', err.code, err.message);
-        setFormData(prev => ({ ...prev, address: prev.address || '' }));
+          console.warn('[Location] error:', err.code, err.message);
+          setFormData(prev => ({ ...prev, address: prev.address || '' }));
 
-        if (err.code === 1 /* PERMISSION_DENIED */) {
-          setLocationModal({ open: true, type: 'denied' });
-        } else if (err.code === 2 /* POSITION_UNAVAILABLE */) {
-          setLocationModal({ open: true, type: 'unavailable' });
-        } else {
-          setLocationModal({ open: true, type: 'timeout' });
+          if (err.code === 1 /* PERMISSION_DENIED */) {
+            setLocationModal({ open: true, type: 'denied' });
+          } else if (err.code === 2 /* POSITION_UNAVAILABLE */) {
+            setLocationModal({ open: true, type: 'unavailable' });
+          } else {
+            setLocationModal({ open: true, type: 'timeout' });
+          }
+        },
+        {
+          // false = use WiFi/cell/IP instead of GPS — instant on desktop, fast on mobile
+          enableHighAccuracy: false,
+          // 8 s is plenty for network-based location; GPS-based can need 15+ s
+          timeout: 8000,
+          // accept a cached position up to 30 s old to avoid redundant fetches
+          maximumAge: 30000,
         }
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
+      );
+    } catch (e) {
+      // synchronous throw from getCurrentPosition (rare but possible in some browsers)
+      console.error('[Location] getCurrentPosition threw:', e);
+      setIsFetchingLocation(false);
+      setLocationModal({ open: true, type: 'unavailable' });
+    }
   };
 
   // Entry point — checks permission state first, then decides what to show.
@@ -1347,10 +1371,9 @@ const VisitForm = () => {
           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-fade-in">
 
             {/* Icon */}
-            <div className={`mx-auto mb-4 w-14 h-14 rounded-full flex items-center justify-center ${
-              locationModal.type === 'prompt'    ? 'bg-primary-100' :
-              locationModal.type === 'denied'    ? 'bg-red-100'     : 'bg-amber-100'
-            }`}>
+            <div className={`mx-auto mb-4 w-14 h-14 rounded-full flex items-center justify-center ${locationModal.type === 'prompt' ? 'bg-primary-100' :
+                locationModal.type === 'denied' ? 'bg-red-100' : 'bg-amber-100'
+              }`}>
               {locationModal.type === 'denied'
                 ? <Smartphone size={26} className="text-red-500" />
                 : <MapPin size={26} className={locationModal.type === 'prompt' ? 'text-primary-600' : 'text-amber-500'} />
