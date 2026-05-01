@@ -639,17 +639,17 @@ const VisitForm = () => {
     }]);
   };
 
-  const fetchLocation = async () => {
-    if (!navigator.geolocation) {
-      setLocationModal({ open: true, type: 'unsupported' });
-      return;
-    }
-
+  // Directly calls getCurrentPosition — use only when permission is known to be
+  // "granted" or "prompt" (the latter triggers the native browser popup).
+  const doFetchLocation = () => {
+    setLocationModal({ open: false, type: null });
     setIsFetchingLocation(true);
+    console.log('[Location] calling getCurrentPosition…');
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
+        console.log('[Location] success:', latitude, longitude);
         try {
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
@@ -660,7 +660,7 @@ const VisitForm = () => {
             `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`;
           setFormData(prev => ({ ...prev, address: readableAddress }));
         } catch (err) {
-          console.error('Reverse geocoding error:', err);
+          console.error('[Location] reverse geocoding error:', err);
           setFormData(prev => ({
             ...prev,
             address: `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`
@@ -672,6 +672,7 @@ const VisitForm = () => {
       },
       (err) => {
         setIsFetchingLocation(false);
+        console.warn('[Location] error:', err.code, err.message);
         setFormData(prev => ({ ...prev, address: prev.address || '' }));
 
         if (err.code === 1 /* PERMISSION_DENIED */) {
@@ -684,6 +685,47 @@ const VisitForm = () => {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
+  };
+
+  // Entry point — checks permission state first, then decides what to show.
+  const fetchLocation = async () => {
+    if (!navigator.geolocation) {
+      setLocationModal({ open: true, type: 'unsupported' });
+      return;
+    }
+
+    // navigator.permissions is not available on iOS Safari < 16 — guard it
+    if (navigator.permissions) {
+      try {
+        const status = await navigator.permissions.query({ name: 'geolocation' });
+        console.log('[Location] permission state:', status.state);
+
+        if (status.state === 'granted') {
+          // Already allowed — fetch directly, no modal needed
+          doFetchLocation();
+          return;
+        }
+
+        if (status.state === 'denied') {
+          // Permanently blocked — show settings instructions, never call getCurrentPosition
+          setLocationModal({ open: true, type: 'denied' });
+          return;
+        }
+
+        // state === 'prompt' — show our custom modal first.
+        // When the user taps "Enable Location", doFetchLocation() is called
+        // which triggers the real browser permission popup.
+        setLocationModal({ open: true, type: 'prompt' });
+        return;
+      } catch (err) {
+        console.warn('[Location] permissions API error (falling back):', err);
+        // Fall through to direct call below
+      }
+    }
+
+    // Fallback for browsers without permissions API (iOS Safari < 16, Firefox)
+    // getCurrentPosition itself will trigger the native prompt if needed.
+    doFetchLocation();
   };
 
   const handlePhotoUpload = async (e) => {
@@ -1302,14 +1344,16 @@ const VisitForm = () => {
       {/* Location Permission Modal */}
       {locationModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-fade-in">
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-fade-in">
+
             {/* Icon */}
             <div className={`mx-auto mb-4 w-14 h-14 rounded-full flex items-center justify-center ${
-              locationModal.type === 'denied' ? 'bg-red-100' : 'bg-amber-100'
+              locationModal.type === 'prompt'    ? 'bg-primary-100' :
+              locationModal.type === 'denied'    ? 'bg-red-100'     : 'bg-amber-100'
             }`}>
               {locationModal.type === 'denied'
                 ? <Smartphone size={26} className="text-red-500" />
-                : <MapPin size={26} className="text-amber-500" />
+                : <MapPin size={26} className={locationModal.type === 'prompt' ? 'text-primary-600' : 'text-amber-500'} />
               }
             </div>
 
@@ -1321,36 +1365,46 @@ const VisitForm = () => {
               <X size={18} />
             </button>
 
-            {/* Content */}
+            {/* ── PROMPT: permission not yet asked ── */}
+            {locationModal.type === 'prompt' && (
+              <>
+                <h3 className="text-center text-lg font-bold text-slate-800 mb-1">
+                  Enable Location Access
+                </h3>
+                <p className="text-center text-sm text-slate-500 mb-5">
+                  Tap <strong>Enable Location</strong> below. Your browser will ask you to allow access — tap <strong>Allow</strong> in that popup.
+                </p>
+              </>
+            )}
+
+            {/* ── DENIED: blocked in settings ── */}
             {locationModal.type === 'denied' && (
               <>
                 <h3 className="text-center text-lg font-bold text-slate-800 mb-1">
                   Location Permission Denied
                 </h3>
                 <p className="text-center text-sm text-slate-500 mb-4">
-                  Your browser is blocking location access. Follow these steps to enable it:
+                  Your browser is blocking location access. Follow these steps:
                 </p>
                 <ol className="text-sm text-slate-600 space-y-2 mb-5 list-none">
-                  <li className="flex items-start gap-2">
-                    <span className="mt-0.5 w-5 h-5 rounded-full bg-primary-100 text-primary-700 font-bold text-xs flex items-center justify-center shrink-0">1</span>
-                    Open your phone <strong>Settings</strong>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-0.5 w-5 h-5 rounded-full bg-primary-100 text-primary-700 font-bold text-xs flex items-center justify-center shrink-0">2</span>
-                    Go to <strong>Privacy → Location Services</strong>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-0.5 w-5 h-5 rounded-full bg-primary-100 text-primary-700 font-bold text-xs flex items-center justify-center shrink-0">3</span>
-                    Find your <strong>browser</strong> (Safari / Chrome) and set it to <strong>While Using</strong>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-0.5 w-5 h-5 rounded-full bg-primary-100 text-primary-700 font-bold text-xs flex items-center justify-center shrink-0">4</span>
-                    Come back here and tap <strong>Try Again</strong>
-                  </li>
+                  {[
+                    <>Open your phone <strong>Settings</strong></>,
+                    <>Go to <strong>Privacy → Location Services</strong></>,
+                    <>Find your <strong>browser</strong> (Safari / Chrome) → set to <strong>While Using</strong></>,
+                    <>Return here and tap <strong>Try Again</strong></>,
+                  ].map((step, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="mt-0.5 w-5 h-5 rounded-full bg-primary-100 text-primary-700 font-bold text-xs flex items-center justify-center shrink-0">
+                        {i + 1}
+                      </span>
+                      {step}
+                    </li>
+                  ))}
                 </ol>
               </>
             )}
 
+            {/* ── UNAVAILABLE ── */}
             {locationModal.type === 'unavailable' && (
               <>
                 <h3 className="text-center text-lg font-bold text-slate-800 mb-1">
@@ -1362,17 +1416,19 @@ const VisitForm = () => {
               </>
             )}
 
+            {/* ── TIMEOUT ── */}
             {locationModal.type === 'timeout' && (
               <>
                 <h3 className="text-center text-lg font-bold text-slate-800 mb-1">
                   Location Timed Out
                 </h3>
                 <p className="text-center text-sm text-slate-500 mb-5">
-                  The location request took too long. Move to an open area with better GPS signal and try again.
+                  The location request took too long. Move to an open area and try again.
                 </p>
               </>
             )}
 
+            {/* ── UNSUPPORTED ── */}
             {locationModal.type === 'unsupported' && (
               <>
                 <h3 className="text-center text-lg font-bold text-slate-800 mb-1">
@@ -1386,17 +1442,36 @@ const VisitForm = () => {
 
             {/* Actions */}
             <div className="flex flex-col gap-2">
-              {locationModal.type !== 'unsupported' && (
+              {/* "prompt" → call doFetchLocation() directly to trigger browser popup */}
+              {locationModal.type === 'prompt' && (
                 <button
-                  onClick={() => {
-                    setLocationModal({ open: false, type: null });
-                    fetchLocation();
-                  }}
+                  onClick={doFetchLocation}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm transition-colors"
+                >
+                  <MapPin size={16} /> Enable Location
+                </button>
+              )}
+
+              {/* "denied" → re-check permission (user may have changed settings) */}
+              {locationModal.type === 'denied' && (
+                <button
+                  onClick={fetchLocation}
                   className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm transition-colors"
                 >
                   <RefreshCw size={16} /> Try Again
                 </button>
               )}
+
+              {/* GPS/timeout errors → retry the actual fetch */}
+              {(locationModal.type === 'unavailable' || locationModal.type === 'timeout') && (
+                <button
+                  onClick={doFetchLocation}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm transition-colors"
+                >
+                  <RefreshCw size={16} /> Try Again
+                </button>
+              )}
+
               <button
                 onClick={() => setLocationModal({ open: false, type: null })}
                 className="w-full py-3 rounded-2xl border border-slate-200 text-slate-500 font-semibold text-sm hover:bg-slate-50 transition-colors"
