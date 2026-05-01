@@ -10,14 +10,8 @@ import { getVisitSubmitErrorMessage } from '../../api/submitErrors';
 import {
   Plus, Trash, Save, ArrowLeft, Building, FireExtinguisher, FileText,
   Search, Check, AlertTriangle, ArrowRight, UserPlus, MapPin, Camera, Image, Mic, Square,
-  EyeOff,
-  Eye,
-  Pencil,
-  History,
-  Calendar,
-  ScanLine,
-  CheckCircle2,
-  XCircle
+  EyeOff, Eye, Pencil, History, Calendar, ScanLine, CheckCircle2, XCircle,
+  X, RefreshCw, Smartphone
 } from 'lucide-react';
 import bcrypt from 'bcryptjs';
 import { useRef } from 'react';
@@ -148,6 +142,7 @@ const VisitForm = () => {
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [locationModal, setLocationModal] = useState({ open: false, type: null });
   const [showPassword, setShowPassword] = useState(false);
   const [recordingIndex, setRecordingIndex] = useState(null);
   const [unitVoiceWarnings, setUnitVoiceWarnings] = useState({});
@@ -646,57 +641,46 @@ const VisitForm = () => {
 
   const fetchLocation = async () => {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser. Please enter address manually.");
+      setLocationModal({ open: true, type: 'unsupported' });
       return;
     }
 
-    setIsFetchingLocation(true); // ← Loading start
+    setIsFetchingLocation(true);
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
-
         try {
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
           );
-
-          if (!response.ok) {
-            throw new Error("Failed to fetch address");
-          }
-
+          if (!response.ok) throw new Error('Failed to fetch address');
           const data = await response.json();
-
-          let readableAddress = data.display_name ||
+          const readableAddress = data.display_name ||
             `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`;
-
           setFormData(prev => ({ ...prev, address: readableAddress }));
         } catch (err) {
-          console.error("Reverse geocoding error:", err);
+          console.error('Reverse geocoding error:', err);
           setFormData(prev => ({
             ...prev,
-            address: `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)} (couldn't get full address)`
+            address: `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`
           }));
-          alert("Couldn't fetch readable address. Using coordinates instead.");
+          toast('Could not resolve a readable address — coordinates saved.', { icon: '📍' });
         } finally {
-          setIsFetchingLocation(false); // ← Loading end (success ya fail dono mein)
+          setIsFetchingLocation(false);
         }
       },
       (err) => {
-        setIsFetchingLocation(false); // ← Loading end
+        setIsFetchingLocation(false);
+        setFormData(prev => ({ ...prev, address: prev.address || '' }));
 
-        let errorMsg = "Failed to get location.";
-
-        if (err.code === err.PERMISSION_DENIED) {
-          errorMsg = "Location access denied. Please enable location permission in browser settings and try again.";
-        } else if (err.code === err.POSITION_UNAVAILABLE) {
-          errorMsg = "Location information is unavailable. Make sure GPS/location is turned ON on your device.";
-        } else if (err.code === err.TIMEOUT) {
-          errorMsg = "Location request timed out. Please try again.";
+        if (err.code === 1 /* PERMISSION_DENIED */) {
+          setLocationModal({ open: true, type: 'denied' });
+        } else if (err.code === 2 /* POSITION_UNAVAILABLE */) {
+          setLocationModal({ open: true, type: 'unavailable' });
+        } else {
+          setLocationModal({ open: true, type: 'timeout' });
         }
-
-        alert(errorMsg);
-        setFormData(prev => ({ ...prev, address: prev.address || "Enable location to auto-fill" }));
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
@@ -1314,6 +1298,116 @@ const VisitForm = () => {
   return (
     <div className="relative min-h-[500px] max-w-4xl mx-auto p-2 md:p-8">
       <Toaster position="top-center" />
+
+      {/* Location Permission Modal */}
+      {locationModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-fade-in">
+            {/* Icon */}
+            <div className={`mx-auto mb-4 w-14 h-14 rounded-full flex items-center justify-center ${
+              locationModal.type === 'denied' ? 'bg-red-100' : 'bg-amber-100'
+            }`}>
+              {locationModal.type === 'denied'
+                ? <Smartphone size={26} className="text-red-500" />
+                : <MapPin size={26} className="text-amber-500" />
+              }
+            </div>
+
+            {/* Close */}
+            <button
+              onClick={() => setLocationModal({ open: false, type: null })}
+              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-slate-100 text-slate-400"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Content */}
+            {locationModal.type === 'denied' && (
+              <>
+                <h3 className="text-center text-lg font-bold text-slate-800 mb-1">
+                  Location Permission Denied
+                </h3>
+                <p className="text-center text-sm text-slate-500 mb-4">
+                  Your browser is blocking location access. Follow these steps to enable it:
+                </p>
+                <ol className="text-sm text-slate-600 space-y-2 mb-5 list-none">
+                  <li className="flex items-start gap-2">
+                    <span className="mt-0.5 w-5 h-5 rounded-full bg-primary-100 text-primary-700 font-bold text-xs flex items-center justify-center shrink-0">1</span>
+                    Open your phone <strong>Settings</strong>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-0.5 w-5 h-5 rounded-full bg-primary-100 text-primary-700 font-bold text-xs flex items-center justify-center shrink-0">2</span>
+                    Go to <strong>Privacy → Location Services</strong>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-0.5 w-5 h-5 rounded-full bg-primary-100 text-primary-700 font-bold text-xs flex items-center justify-center shrink-0">3</span>
+                    Find your <strong>browser</strong> (Safari / Chrome) and set it to <strong>While Using</strong>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="mt-0.5 w-5 h-5 rounded-full bg-primary-100 text-primary-700 font-bold text-xs flex items-center justify-center shrink-0">4</span>
+                    Come back here and tap <strong>Try Again</strong>
+                  </li>
+                </ol>
+              </>
+            )}
+
+            {locationModal.type === 'unavailable' && (
+              <>
+                <h3 className="text-center text-lg font-bold text-slate-800 mb-1">
+                  Location Unavailable
+                </h3>
+                <p className="text-center text-sm text-slate-500 mb-5">
+                  Your device could not determine its location. Make sure GPS / Location Services are turned <strong>ON</strong> and try again.
+                </p>
+              </>
+            )}
+
+            {locationModal.type === 'timeout' && (
+              <>
+                <h3 className="text-center text-lg font-bold text-slate-800 mb-1">
+                  Location Timed Out
+                </h3>
+                <p className="text-center text-sm text-slate-500 mb-5">
+                  The location request took too long. Move to an open area with better GPS signal and try again.
+                </p>
+              </>
+            )}
+
+            {locationModal.type === 'unsupported' && (
+              <>
+                <h3 className="text-center text-lg font-bold text-slate-800 mb-1">
+                  Not Supported
+                </h3>
+                <p className="text-center text-sm text-slate-500 mb-5">
+                  Your browser does not support location access. Please type your address manually.
+                </p>
+              </>
+            )}
+
+            {/* Actions */}
+            <div className="flex flex-col gap-2">
+              {locationModal.type !== 'unsupported' && (
+                <button
+                  onClick={() => {
+                    setLocationModal({ open: false, type: null });
+                    fetchLocation();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm transition-colors"
+                >
+                  <RefreshCw size={16} /> Try Again
+                </button>
+              )}
+              <button
+                onClick={() => setLocationModal({ open: false, type: null })}
+                className="w-full py-3 rounded-2xl border border-slate-200 text-slate-500 font-semibold text-sm hover:bg-slate-50 transition-colors"
+              >
+                Enter Address Manually
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading && <PageLoader message="Processing your visit log..." />}
       {/* Header / Stepper */}
       <div className="flex items-center justify-between mb-8">
