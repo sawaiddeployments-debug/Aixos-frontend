@@ -816,17 +816,66 @@ const VisitForm = () => {
     }
   };
 
+  console.log(formData)
   const generateQRPreview = async () => {
     if (!formData.businessName) {
       alert("Please enter business name first");
       return;
     }
+    setLoading(true);
     try {
-      const previewId = formData.customerId || 'temp-id-' + Date.now();
-      const qrContent = JSON.stringify({ id: previewId, type: 'customer', name: formData.businessName });
-      const qrDataUrl = await QRCode.toDataURL(qrContent);
+      let custId = formData.customerId;
+
+      // New customer: save to DB first to get a real ID
+      if (!custId) {
+        let finalBusinessType = formData.businessType;
+        if (formData.businessType === 'Other' && formData.customBusinessType.trim()) {
+          finalBusinessType = formData.customBusinessType.trim();
+        }
+        const hashedPassword = bcrypt.hashSync(formData.password || '123456', 8);
+
+        const { data: newCust, error: insertErr } = await supabase
+          .from('customers')
+          .insert([{
+            business_name: formData.businessName,
+            owner_name: formData.ownerName || null,
+            email: formData.email || `lead-${Date.now()}@temp.com`,
+            password: hashedPassword,
+            phone: formData.phone || null,
+            address: formData.address || null,
+            business_type: finalBusinessType,
+            status: 'Lead',
+          }])
+          .select()
+          .single();
+
+        if (insertErr) throw insertErr;
+
+        custId = newCust.id;
+        setFormData(prev => ({ ...prev, customerId: custId }));
+        console.log('[QR] New customer created for QR, id:', custId);
+      }
+
+      const url = `${window.location.origin}/agent/customer/${custId}`;
+      const qrDataUrl = await QRCode.toDataURL(url, {
+        errorCorrectionLevel: 'M',
+        width: 256,
+        margin: 2,
+      });
+
+      // Persist QR URL on the customer record
+      await supabase.from('customers').update({
+        qr_code_url: qrDataUrl,
+        last_updated: new Date().toISOString(),
+      }).eq('id', custId);
+
       setQrPreview(qrDataUrl);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error('[QR] generateQRPreview error:', err);
+      alert('Failed to generate QR code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const MAX_VOICE_NOTE_SIZE = 256000; // bytes
@@ -1167,8 +1216,12 @@ const VisitForm = () => {
         console.log("New Lead Created with ID:", finalCustId);
 
         try {
-          const qrContent = JSON.stringify({ id: finalCustId, type: 'customer', name: formData.businessName });
-          finalQrUrl = await QRCode.toDataURL(qrContent);
+          const qrUrl = `${window.location.origin}/agent/customer/${finalCustId}`;
+          finalQrUrl = await QRCode.toDataURL(qrUrl, {
+            errorCorrectionLevel: 'M',
+            width: 256,
+            margin: 2,
+          });
           await supabase.from('customers').update({
             qr_code_url: finalQrUrl,
             last_updated: new Date().toISOString()
@@ -1177,6 +1230,23 @@ const VisitForm = () => {
           console.error('QR generation/update failed:', qrErr);
         }
       }
+      // If customer was pre-created during QR generation, sync latest form data to DB
+      if (finalCustId && isNewCustomer) {
+        let imageUrl = null;
+        if (formData.customerPhoto) {
+          imageUrl = await uploadCustomerPhoto(formData.customerPhoto);
+        }
+        await supabase.from('customers').update({
+          business_name: formData.businessName,
+          owner_name: formData.ownerName || null,
+          phone: formData.phone || null,
+          address: formData.address || null,
+          business_type: finalBusinessType,
+          ...(imageUrl && { image_url: imageUrl }),
+          last_updated: new Date().toISOString(),
+        }).eq('id', finalCustId);
+      }
+
       // Note: Existing customer updates are now handled immediately in Step 1 by handleUpdateCustomer
 
       // SAFEGUARD: Ensure we have a valid Customer ID before proceeding
@@ -1372,7 +1442,7 @@ const VisitForm = () => {
 
             {/* Icon */}
             <div className={`mx-auto mb-4 w-14 h-14 rounded-full flex items-center justify-center ${locationModal.type === 'prompt' ? 'bg-primary-100' :
-                locationModal.type === 'denied' ? 'bg-red-100' : 'bg-amber-100'
+              locationModal.type === 'denied' ? 'bg-red-100' : 'bg-amber-100'
               }`}>
               {locationModal.type === 'denied'
                 ? <Smartphone size={26} className="text-red-500" />
