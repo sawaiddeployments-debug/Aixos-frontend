@@ -3,12 +3,15 @@ import { supabase } from '../supabaseClient';
 
 const GENAI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(GENAI_API_KEY);
-const model = genAI.getGenerativeModel({ 
+const model = genAI.getGenerativeModel({
   model: "gemini-flash-latest",
   generationConfig: {
-    temperature: 0.2, // Lower temperature for higher accuracy and less hallucination
+    temperature: 0.2,
   }
 });
+
+const COMPLAINT_AI_ENDPOINT =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 export const aiService = {
   /**
@@ -220,6 +223,59 @@ ${JSON.stringify(context, null, 2)}
       return [];
     }
     return data || [];
+  },
+
+  async getComplaintReply(userMessage, userRole) {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+    console.log('[ComplaintAI] Sending to AI:', userMessage);
+    console.log('[ComplaintAI] API key loaded:', apiKey ? `${apiKey.slice(0, 6)}...` : 'MISSING');
+
+    if (!apiKey) throw new Error('VITE_GEMINI_API_KEY is not set in .env');
+
+    const systemPrompt = `You are an AI Customer Support Agent for AIXOS Firefighter service management platform.
+
+PLATFORM CONTEXT:
+- This system manages Agents, Partners, and Customers
+- Services include: Validation, Refilled (Fire Extinguishers), Maintenance, New Unit Sales
+
+BEHAVIOR RULES:
+- Be professional but friendly
+- Keep responses short and clear (2-3 sentences max)
+- Use simple English (or Roman Urdu if user writes in Roman Urdu)
+- If complaint: respond politely and assure resolution
+- If angry user: stay calm and helpful
+- If unclear: ask for clarification
+- If user asks for summary: respond in table format
+- NEVER guess random data or make up service details
+- Do NOT expose technical system details
+
+Current user role: ${userRole || 'User'}`;
+
+    const res = await fetch(`${COMPLAINT_AI_ENDPOINT}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+        generationConfig: { temperature: 0.3 },
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error('[ComplaintAI] Gemini API error:', res.status, errBody);
+      throw new Error(`Gemini ${res.status}: ${errBody}`);
+    }
+
+    const data = await res.json();
+    console.log('[ComplaintAI] Raw response:', data);
+
+    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!reply) throw new Error('Empty response from Gemini');
+
+    console.log('[ComplaintAI] AI Response:', reply);
+    return reply;
   },
 
   async deleteAllSessions(partnerId) {

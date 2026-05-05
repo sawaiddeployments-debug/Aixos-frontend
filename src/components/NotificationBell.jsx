@@ -260,89 +260,175 @@ const NotificationBell = ({ onOpenChat }) => {
     }, [user?.id, role]);
 
     useEffect(() => {
-        if (role === 'customer' && user?.id) {
+        if (!user?.id || !role) {
+            setNotifications([]);
+            setUnreadCount(0);
+            return;
+        }
+
+        // Helper: append a new notification row from payload directly (no full refetch)
+        const appendNotification = (n, buildItem) => {
+            const item = buildItem(n);
+            setNotifications((prev) => {
+                if (prev.some((x) => x.id === item.id)) return prev;
+                return [item, ...prev].slice(0, 15);
+            });
+            setUnreadCount((prev) => prev + 1);
+        };
+
+        const channels = [];
+
+        // ── CUSTOMER ──────────────────────────────────────────────
+        if (role === 'customer') {
             loadCustomerNotifications();
 
-            const channel = supabase
-                .channel(`user_notifications_${user.id}`)
-                .on(
-                    'postgres_changes',
-                    {
-                        event: 'INSERT',
-                        table: 'notifications',
-                        filter: `recipient_id=eq.${user.id}`
-                    },
-                    () => {
-                        loadCustomerNotifications();
-                    }
-                )
-                .subscribe();
+            const notifChannel = supabase
+                .channel(`notif_customer_${user.id}`)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: `recipient_id=eq.${user.id}`,
+                }, (payload) => {
+                    console.log('[NotificationBell] customer notification received:', payload.new);
+                    const n = payload.new;
+                    appendNotification(n, (n) => ({
+                        id: `notif-${n.id}`,
+                        title: n.notification_type === 'partial_accept'
+                            ? 'Partial refill update'
+                            : n.sender_role === 'partner' ? 'Partner Update' : 'New System Alert',
+                        message: n.message,
+                        type: n.notification_type === 'partial_accept' ? 'partial_accept' : 'message',
+                        timestamp: n.created_at,
+                        isRead: false,
+                        relatedId: n.inquiry_id,
+                        senderId: n.sender_id,
+                        senderRole: n.sender_role,
+                    }));
+                })
+                .subscribe((status) => {
+                    console.log('[NotificationBell] customer notif subscription:', status);
+                });
 
-            return () => {
-                supabase.removeChannel(channel);
-            };
+            // Badge update when admin replies to this user's complaint
+            const complaintChannel = supabase
+                .channel(`complaint_customer_${user.id}`)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'complaints',
+                    filter: `user_id=eq.${user.id}`,
+                }, (payload) => {
+                    if (!payload.new.is_admin) return;
+                    console.log('[NotificationBell] customer complaint reply received:', payload.new);
+                    loadCustomerNotifications();
+                })
+                .subscribe((status) => {
+                    console.log('[NotificationBell] customer complaint subscription:', status);
+                });
+
+            channels.push(notifChannel, complaintChannel);
         }
 
-        if (role === 'agent' && user?.id) {
+        // ── AGENT ─────────────────────────────────────────────────
+        if (role === 'agent') {
             loadAgentNotifications();
 
-            const channel = supabase
-                .channel(`user_notifications_agent_${user.id}`)
-                .on(
-                    'postgres_changes',
-                    {
-                        event: 'INSERT',
-                        table: 'notifications',
-                        filter: `recipient_id=eq.${user.id}`
-                    },
-                    () => {
-                        loadAgentNotifications();
-                    }
-                )
-                .subscribe();
+            const notifChannel = supabase
+                .channel(`notif_agent_${user.id}`)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: `recipient_id=eq.${user.id}`,
+                }, (payload) => {
+                    console.log('[NotificationBell] agent notification received:', payload.new);
+                    const n = payload.new;
+                    appendNotification(n, (n) => ({
+                        id: `notif-${n.id}`,
+                        title: n.notification_type === 'partial_accept'
+                            ? 'Partial refill update'
+                            : n.sender_role === 'partner' ? 'Partner update' : 'System alert',
+                        message: n.message,
+                        type: n.notification_type === 'partial_accept' ? 'partial_accept' : 'message',
+                        timestamp: n.created_at,
+                        isRead: false,
+                        relatedId: n.inquiry_id,
+                        senderId: n.sender_id,
+                        senderRole: n.sender_role,
+                    }));
+                })
+                .subscribe((status) => {
+                    console.log('[NotificationBell] agent notif subscription:', status);
+                });
 
-            return () => {
-                supabase.removeChannel(channel);
-            };
+            const complaintChannel = supabase
+                .channel(`complaint_agent_${user.id}`)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'complaints',
+                    filter: `user_id=eq.${user.id}`,
+                }, (payload) => {
+                    if (!payload.new.is_admin) return;
+                    console.log('[NotificationBell] agent complaint reply received:', payload.new);
+                    loadAgentNotifications();
+                })
+                .subscribe((status) => {
+                    console.log('[NotificationBell] agent complaint subscription:', status);
+                });
+
+            channels.push(notifChannel, complaintChannel);
         }
 
-        if ((role === 'partner' || role === 'admin') && user?.id) {
+        // ── PARTNER / ADMIN ───────────────────────────────────────
+        if (role === 'partner' || role === 'admin') {
             loadGenericNotifications();
 
             const notifChannel = supabase
-                .channel(`user_notifications_generic_${user.id}`)
-                .on(
-                    'postgres_changes',
-                    {
-                        event: 'INSERT',
-                        table: 'notifications',
-                        filter: `recipient_id=eq.${user.id}`
-                    },
-                    () => {
-                        loadGenericNotifications();
-                    }
-                )
-                .subscribe();
+                .channel(`notif_generic_${user.id}`)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: `recipient_id=eq.${user.id}`,
+                }, (payload) => {
+                    console.log('[NotificationBell] partner/admin notification received:', payload.new);
+                    const n = payload.new;
+                    appendNotification(n, (n) => ({
+                        id: `notif-${n.id}`,
+                        title: 'System alert',
+                        message: n.message,
+                        type: 'message',
+                        timestamp: n.created_at,
+                        isRead: false,
+                    }));
+                })
+                .subscribe((status) => {
+                    console.log('[NotificationBell] partner/admin notif subscription:', status);
+                });
 
+            // Admin needs to know about ALL new complaint messages (any user)
             const complaintChannel = supabase
-                .channel(`user_complaints_generic_${user.id}`)
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'complaints' }, () => {
+                .channel(`complaint_generic_${user.id}`)
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'complaints',
+                }, (payload) => {
+                    console.log('[NotificationBell] partner/admin complaint received:', payload.new);
                     loadGenericNotifications();
                 })
-                .subscribe();
+                .subscribe((status) => {
+                    console.log('[NotificationBell] partner/admin complaint subscription:', status);
+                });
 
-            return () => {
-                supabase.removeChannel(notifChannel);
-                supabase.removeChannel(complaintChannel);
-            };
+            channels.push(notifChannel, complaintChannel);
         }
 
-        if (role !== 'customer' && role !== 'agent') {
-            if (role !== 'partner' && role !== 'admin') {
-                setNotifications([]);
-                setUnreadCount(0);
-            }
-        }
+        return () => {
+            channels.forEach((ch) => supabase.removeChannel(ch));
+        };
     }, [role, user?.id, loadCustomerNotifications, loadAgentNotifications, loadGenericNotifications]);
 
     useEffect(() => {

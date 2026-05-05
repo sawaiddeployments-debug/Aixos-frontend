@@ -5,20 +5,25 @@ import {
     getComplaintMessages,
     markThreadMessagesAsRead,
     sendAdminComplaintReply,
+    sendBotComplaintReply,
     sendUserComplaint
 } from '../../api/complaintsApi';
+import { aiService } from '../../services/ai.service';
 
 const ComplaintChat = ({ userId, userRole, isAdminView = false }) => {
     const threadUserId = userId == null ? '' : String(userId).trim();
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
+    const [aiTyping, setAiTyping] = useState(false);
     const [draft, setDraft] = useState('');
     const endRef = useRef(null);
 
     const loadMessages = async () => {
         if (!threadUserId) return;
+        console.log('[ComplaintChat] loadMessages for threadUserId:', threadUserId, '| isAdminView:', isAdminView);
         const data = await getComplaintMessages(threadUserId);
+        console.log('[ComplaintChat] Loaded', data.length, 'messages — user:', data.filter(m => !m.is_admin).length, '| bot/admin:', data.filter(m => m.is_admin).length);
         setMessages(data);
     };
 
@@ -48,54 +53,117 @@ const ComplaintChat = ({ userId, userRole, isAdminView = false }) => {
 
     useEffect(() => {
         if (!threadUserId) return undefined;
+
+        const channelName = `complaints_${threadUserId}_${isAdminView ? 'admin' : 'user'}`;
+        console.log('[ComplaintChat] Setting up realtime channel:', channelName);
+
         const channel = supabase
-            .channel(`complaints_${threadUserId}`)
+            .channel(channelName)
             .on(
                 'postgres_changes',
                 {
                     event: 'INSERT',
                     schema: 'public',
                     table: 'complaints',
-                    filter: `user_id=eq.${threadUserId}`
+                    filter: `user_id=eq.${threadUserId}`,
                 },
                 (payload) => {
+                    console.log('[ComplaintChat] Realtime INSERT received:', {
+                        id: payload.new.id,
+                        is_admin: payload.new.is_admin,
+                        is_bot: payload.new.is_bot,
+                        preview: payload.new.message?.slice(0, 50),
+                    });
                     setMessages((prev) => {
-                        if (prev.some((m) => m.id === payload.new.id)) return prev;
-                        return [...prev, payload.new];
+                        // Replace optimistic entry if it exists, otherwise append
+                        const withoutOptimistic = prev.filter(m => !String(m.id).startsWith('optimistic-'));
+                        if (withoutOptimistic.some((m) => m.id === payload.new.id)) return prev;
+                        return [...withoutOptimistic, payload.new];
                     });
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                console.log('[ComplaintChat] Subscription status:', status, '| channel:', channelName);
+            });
 
         return () => {
+            console.log('[ComplaintChat] Removing channel:', channelName);
             supabase.removeChannel(channel);
         };
-    }, [threadUserId]);
+    }, [threadUserId, isAdminView]);
 
     useEffect(() => {
         endRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages.length]);
+    }, [messages.length, aiTyping]);
 
     const handleSend = async (e) => {
         e.preventDefault();
         const message = draft.trim();
-        if (!message || !threadUserId || sending) return;
+        if (!message || !threadUserId || sending || aiTyping) return;
+
+        console.log('[ComplaintChat] handleSend →', { message, threadUserId, userRole, isAdminView });
 
         setSending(true);
         setDraft('');
-        try {
-            if (isAdminView) {
+
+        if (isAdminView) {
+            // Admin manual reply
+            try {
                 await sendAdminComplaintReply({ userId: threadUserId, userRole, message });
-            } else {
-                await sendUserComplaint({ userId: threadUserId, userRole, message });
+                await loadMessages();
+            } catch (err) {
+                console.error('[ComplaintChat] Admin reply failed:', err);
+                setDraft(message);
+            } finally {
+                setSending(false);
             }
-            // Re-fetch immediately so sender sees message even if realtime event lags.
-            await loadMessages();
+            return;
+        }
+
+        // User (agent / partner / customer) flow
+        // Step 1 — Optimistic: show message immediately in local state
+        const optimisticId = `optimistic-${Date.now()}`;
+        const optimisticMsg = {
+            id: optimisticId,
+            user_id: threadUserId,
+            user_role: userRole,
+            message,
+            is_admin: false,
+            is_bot: false,
+            created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, optimisticMsg]);
+        setSending(false);
+
+        try {
+            // Step 2 — Persist user message to DB
+            const saved = await sendUserComplaint({ userId: threadUserId, userRole, message });
+            // Replace optimistic with real DB row
+            setMessages((prev) =>
+                prev.map((m) => (m.id === optimisticId ? { ...optimisticMsg, ...saved } : m))
+            );
+            console.log('[ComplaintChat] User message saved → id:', saved?.id);
         } catch (err) {
-            console.error('Failed to send complaint message', err);
+            console.error('[ComplaintChat] Failed to save user message:', err);
+            // Remove optimistic on failure and restore draft
+            setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
             setDraft(message);
+            return;
+        }
+
+        // Step 3 — Call Gemini AI
+        setAiTyping(true);
+        try {
+            const aiReply = await aiService.getComplaintReply(message, userRole);
+            console.log('[ComplaintChat] AI reply received, saving to DB...');
+            await sendBotComplaintReply({ userId: threadUserId, userRole, message: aiReply });
+        } catch (aiErr) {
+            console.error('[ComplaintAI] Failed to get AI reply:', aiErr);
+            await sendBotComplaintReply({ userId: threadUserId, userRole, message: null });
         } finally {
-            setSending(false);
+            setAiTyping(false);
+            // Final sync to confirm both messages are in state
+            await loadMessages();
         }
     };
 
@@ -118,8 +186,8 @@ const ComplaintChat = ({ userId, userRole, isAdminView = false }) => {
         const fromAdmin = item.is_admin === true;
         const fromBot = item.is_bot === true;
 
-        if (fromAdmin && fromBot) return 'Support Bot';
-        if (isAdminView) return fromAdmin ? 'You' : (userRole || 'User').toString();
+        if (fromAdmin && fromBot) return 'AI Support Bot';
+        if (isAdminView) return fromAdmin ? 'You (Admin)' : `${(userRole || 'User')}`;
         return fromAdmin ? 'Admin' : 'You';
     };
 
@@ -191,6 +259,20 @@ const ComplaintChat = ({ userId, userRole, isAdminView = false }) => {
                                 </div>
                             );
                         })}
+                        {aiTyping && (
+                            <div className="flex justify-start">
+                                <div className="max-w-[78%] rounded-2xl bg-white px-3 py-2 text-sm shadow-sm">
+                                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                                        AI Support
+                                    </p>
+                                    <div className="flex items-center gap-1 py-1">
+                                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '0ms' }} />
+                                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '150ms' }} />
+                                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: '300ms' }} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         <div ref={endRef} />
                     </div>
                 )}
@@ -201,13 +283,13 @@ const ComplaintChat = ({ userId, userRole, isAdminView = false }) => {
                     type="text"
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
-                    placeholder="Type your complaint message..."
+                    placeholder={aiTyping ? 'AI is typing...' : 'Type your complaint message...'}
                     className="flex-1 rounded-full border border-slate-200 px-4 py-2 text-sm outline-none focus:border-primary-400"
-                    disabled={sending || !threadUserId}
+                    disabled={sending || aiTyping || !threadUserId}
                 />
                 <button
                     type="submit"
-                    disabled={sending || !draft.trim() || !threadUserId}
+                    disabled={sending || aiTyping || !draft.trim() || !threadUserId}
                     className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-500 text-white disabled:bg-slate-300"
                 >
                     {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}

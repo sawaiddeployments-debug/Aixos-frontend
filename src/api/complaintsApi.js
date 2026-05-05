@@ -1,6 +1,6 @@
 import { supabase } from '../supabaseClient';
 
-const BOT_MESSAGE = 'Human agent will sort it out for you as soon as possible.';
+const BOT_FALLBACK_MESSAGE = 'AI is currently unavailable, please try again.';
 const ADMIN_IDLE_MINUTES = 5;
 
 const minutesAgoIso = (minutes) => new Date(Date.now() - minutes * 60 * 1000).toISOString();
@@ -8,6 +8,7 @@ const normalizeId = (value) => (value == null ? '' : String(value).trim());
 
 export const getComplaintMessages = async (userId) => {
     const normalizedUserId = normalizeId(userId);
+    console.log('[ComplaintAPI] getComplaintMessages → userId:', normalizedUserId);
     if (!normalizedUserId) return [];
 
     const { data, error } = await supabase
@@ -17,6 +18,12 @@ export const getComplaintMessages = async (userId) => {
         .order('created_at', { ascending: true });
 
     if (error) throw error;
+    console.log('[ComplaintAPI] Fetched', data?.length, 'messages →', data?.map(m => ({
+        id: m.id,
+        is_admin: m.is_admin,
+        is_bot: m.is_bot,
+        preview: m.message?.slice(0, 40),
+    })));
     return data || [];
 };
 
@@ -62,9 +69,9 @@ const isAnyAdminActive = async () => {
     return Boolean(data?.length);
 };
 
-const hasRecentHumanAdminReply = async () => {
+const hasRecentHumanAdminReply = async (userId) => {
     const cutoff = minutesAgoIso(ADMIN_IDLE_MINUTES);
-    const { data, error } = await supabase
+    let query = supabase
         .from('complaints')
         .select('id')
         .eq('is_admin', true)
@@ -72,6 +79,9 @@ const hasRecentHumanAdminReply = async () => {
         .gte('created_at', cutoff)
         .limit(1);
 
+    if (userId) query = query.eq('user_id', userId);
+
+    const { data, error } = await query;
     if (error) return false;
     return Boolean(data?.length);
 };
@@ -93,27 +103,39 @@ export const sendUserComplaint = async ({ userId, userRole, message }) => {
         throw new Error('Missing user id for complaint thread');
     }
 
-    const saved = await insertComplaintMessage({
+    const payload = {
         user_id: normalizedUserId,
         user_role: userRole,
         message: message.trim(),
         is_admin: false,
-        is_bot: false
-    });
+        is_bot: false,
+    };
+    console.log('[ComplaintAPI] Saving user message →', payload);
+    return insertComplaintMessage(payload);
+};
 
+export const checkAdminAvailable = async (userId) => {
     const adminActive = await isAnyAdminActive();
-    const recentReply = await hasRecentHumanAdminReply();
-    if (!adminActive && !recentReply) {
-        await insertComplaintMessage({
-            user_id: normalizedUserId,
-            user_role: userRole,
-            message: BOT_MESSAGE,
-            is_admin: true,
-            is_bot: true
-        });
-    }
+    const recentReply = await hasRecentHumanAdminReply(userId);
+    const available = adminActive || recentReply;
+    console.log('[ComplaintAI] Admin available check →', { adminActive, recentReply, available });
+    return available;
+};
 
-    return saved;
+export const sendBotComplaintReply = async ({ userId, userRole, message }) => {
+    const normalizedUserId = normalizeId(userId);
+    if (!normalizedUserId) return;
+
+    const botMessage = message?.trim() || BOT_FALLBACK_MESSAGE;
+    const payload = {
+        user_id: normalizedUserId,
+        user_role: userRole,
+        message: botMessage,
+        is_admin: true,
+        is_bot: true,
+    };
+    console.log('[ComplaintAPI] Saving AI bot reply →', payload);
+    return insertComplaintMessage(payload);
 };
 
 export const sendAdminComplaintReply = async ({ userId, userRole, message }) => {
